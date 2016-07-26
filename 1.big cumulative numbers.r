@@ -1,17 +1,18 @@
 # first load and process data
 	wd <- 'c:/Box Sync/jlittel/comms/client financials/'
 	setwd(wd)
-	source('merge and process.r')
+	source('0. merge and process.r')
 	finx <- fin
 # select columns
 	fin <- select(finx, Year, sales=sales_a, account = Account.Name, purchases=Purchases.from.producers,
-		totalCogs=Total.COGS, active, balance)
+		purchases_a = purchases_a,
+		total_cogs=Total.COGS, active, balance, payments_sem)
 
 # Create summary stats
 		sales_sum <- fin %>%
 			filter(active == TRUE) %>%
 			summarise(sales = sum(sales, na.rm=TRUE), purchases=sum(purchases, na.rm=TRUE),
-				cogs=sum(totalCogs, na.rm=TRUE), n=n())
+				cogs=sum(total_cogs, na.rm=TRUE), n=n())
 
 # Check number of unique clients in set
 	n_accounts <- sum(!duplicated(fin$account))
@@ -20,7 +21,7 @@
 
 # data completeness checks
 	sum(is.na(fin$sales)) / dim(fin)[1]				   # percent missing sales
-	sum(is.na(fin$sales[fin$balance>0])) / dim(fin)[1] # percent missing sales when there was a balance
+	sum(is.na(fin$sales[fin$balance>0])) / dim(fin[fin$balance>0])[1] # percent missing sales when there was a balance
 	sum(fin$sales==0, na.rm=TRUE)                      # number with zero sales
 	sum(fin$sales==0 & fin$balance>0, na.rm=TRUE)      # number with zero sales and a balance
 
@@ -46,7 +47,7 @@
 
 # Years of sales and CAGR
 	y0 <- fin %>%
-		select(account, Year, account, balance, sales, purchases, totalCogs, year_one:max_sales_year) %>%
+		select(account, Year, account, balance, sales, purchases, total_cogs, year_one:max_sales_year) %>%
 	 	# filter(balance>=0, !is.na(sales) ) %>%
 	 	arrange(account, Year) %>%
 	 	group_by(account)  %>%
@@ -68,6 +69,7 @@
 	fin.sales.bal <- fin %>%
 				filter(!is.na(sales) & balance>0)
 
+	# function to calculate the row over previous row growth rate of x			
 	gro_rate <- function(x) {x/lag(x)  }
 
 		 cagrs <- fin.sales %>%
@@ -90,9 +92,9 @@
 	# sum(!duplicated(multi$account))
 
 
-##################	
+#----------------------------------------------	
 ## summary stats #
-##################			
+#----------------------------------------------			
 
 # number of account-years is 2591
 	n_account_years <- sum(!duplicated(fin[fin$balance>0,c('account', 'Year')]))
@@ -133,7 +135,7 @@
 # impute missing data by rolling forward previous period to all future missing periods
 	impute <- fin %>%
 			group_by(account) %>%
-			fill(sales, purchases, totalCogs) %>%
+			fill(sales, purchases, total_cogs) %>%
 			ungroup()
 
 	impute.sales.bal <- filter(impute, balance>0 & !is.na(sales))
@@ -151,9 +153,9 @@
 			summarise(sales_sum = sum(sales, na.rm=TRUE), n=n())
 
 
-##################	
+#----------------------------------------------	
 ##     graphs    #
-##################			
+#----------------------------------------------			
 
 cagrs$grew <- as.factor(cagrs$sales_cagr>0) # category for coloring
 cagrs <- cagrs %>% group_by(account) %>% fill(grew, .direction='up') # fill for NAs
@@ -253,6 +255,23 @@ yr_labels <- levels(factor(growth_by_years$year_n))
 		scale_x_continuous('Year', breaks=c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13))
 	yr.gr
 
+#----------------------------------------------	
+## relationship of payments sem to total cogs on financial statements
+#----------------------------------------------			
+
+lm.pmts <- lm(payments_sem ~ total_cogs + total_cogs^2, data = fin, na.action = na.omit)
+summary(lm.pmts)
+plot(fin$total_cogs / fin$payments_sem)
+pmts_r <- fin$payments_sem / fin$total_cogs
+pmts_r[is.infinite(pmts_r)] <- NA
+summary(pmts_r)
+median(pmts_r -1 , na.rm = TRUE)
+
+
+#--------------------------
+# write output 
+#--------------------------	
+	# this is used by markdown file to produce presentation
 wd <- 'C:/Box Sync/jlittel/comms/client financials'
 setwd(wd)
 save.image('client_fin.Rdata')
