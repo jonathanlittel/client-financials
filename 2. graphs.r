@@ -51,20 +51,30 @@ growth_summary
 	sum(cagrs$sales[cagrs$Year==cagrs$year_zero]) # sales in 'year zero'
 	sum(cagrs$sales[cagrs$Year==cagrs$max_sales_year]) # sales in most recent year
 
-
+#--------------------------------------------
 # Median growth by # years as root client
+#--------------------------------------------
 	fin.sales.bal.or.year.zero <- fin.sales %>%
-		# filter for either having a balance or being the year before the loan
-		# filter(balance>0 | year_zero==Year) %>% 
+		filter(balance>0 | year_zero==Year) %>% # switch to include years before loan
 		group_by(account) %>%
 		arrange(Year) %>%
-		mutate(year_n = Year - year_zero) %>% # counter of years borrowing (0 = year_zero)
-		# mutate(year_n = row_number() - 1 ) %>% # counter of years borrowing (0 = year_zero)
-		mutate(year_over_year = (sales / lag(sales)) - 1 )	%>%
-		mutate(year_over_year = replace(year_over_year, is.infinite(year_over_year), NA)) %>%
+		# mutate(year_n = Year - year_zero) %>% # switch to include years before loan
+		mutate(year_n = row_number() - 1 ) %>% # counter of years borrowing (0 = year_zero)
+		mutate(sales_growth_yoy = (sales / lag(sales)) - 1 )	%>%
+		mutate(sales_growth_yoy = replace(sales_growth_yoy, is.infinite(sales_growth_yoy), NA)) %>%
 		ungroup() 
 
-
+	growth_by_years <- fin.sales.bal.or.year.zero %>%
+			arrange(year_n) %>%
+			group_by(year_n) %>%
+			# mutate(sales_growth_yoy = sales / lag(sales)) %>%
+			summarise(
+				sales_median = median(sales, na.rm=TRUE),
+				year_over_year_growth_median = median( sales_growth_yoy, na.rm=TRUE),
+				year_over_year_growth_mean = mean( sales_growth_yoy, na.rm=TRUE),
+				n = n()
+				)
+    # boxplot and point ----------------------------------------------------
 	# yr.graph <- ggplot(filter(fin.sales.bal.or.year.zero, year_over_year<5, year_over_year>-1.5, !is.na(year_over_year)),
 	#  aes(x=year_n, y=year_over_year))
 	# yr.graph + geom_jitter() + scale_y_continuous(labels = scales::percent) + geom_smooth() + geom_hline(yintercept=0, color='white')
@@ -73,18 +83,6 @@ growth_summary
 	#  aes(x=factor(year_n), y=year_over_year))
 	# yr.graph + geom_boxplot(aes(group=factor(year_n))) +
 	#  scale_y_continuous(labels = scales::percent) + geom_hline(yintercept=0, color='white') 
-
-
-	growth_by_years <- fin.sales.bal.or.year.zero %>%
-			arrange(year_n) %>%
-			group_by(year_n) %>%
-			# mutate(year_over_year = sales / lag(sales)) %>%
-			summarise(
-				sales_median = median(sales, na.rm=TRUE),
-				year_over_year_growth_median = median( year_over_year, na.rm=TRUE),
-				year_over_year_growth_mean = mean( year_over_year, na.rm=TRUE),
-				n = n()
-				)
 
 	# yr.graph <- ggplot(filter(growth_by_years, year_n >= -3), aes(x=year_n, y=year_over_year_growth_median))
 	# yr.graph + geom_line() + scale_y_continuous(labels=scales::percent)
@@ -100,7 +98,7 @@ growth_summary
 		geom_text(check_overlap = TRUE, hjust = 0, nudge_x = 0.10) +
 		# ggtitle('Growth by # of Years as Client') +
 		geom_line(alpha=0.2, color='blue') +
-		scale_y_continuous('Year over year growth rate, median (percent)', labels=scales::percent) + 
+		scale_y_continuous('Year over year sales growth, median (percent)', labels=scales::percent) + 
 		scale_x_continuous('Year', breaks=c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13))
 	yr.gr
 
@@ -108,36 +106,36 @@ growth_summary
 #---------------------------------------------
 	# version including years before loan:
 # Median growth by # years as root client
-	# fin.sales.bal.or.year.zero <- fin.sales %>%
-	# 	# filter for either having a balance or being the year before the loan
-	# 	# filter(balance>0 | year_zero==Year) %>% 
-	# 	group_by(account) %>%
-	# 	arrange(Year) %>%
-	# 	mutate(year_n = Year - year_zero) %>% # counter of years borrowing (0 = year_zero)
-	# 	# mutate(year_n = row_number() - 1 ) %>% # counter of years borrowing (0 = year_zero)
-	# 	mutate(year_over_year = (sales / lag(sales)) - 1 )	%>%
-	# 	mutate(year_over_year = replace(year_over_year, is.infinite(year_over_year), NA)) %>%
-	# 	ungroup() 
-	# growth_by_years <- fin.sales.bal.or.year.zero %>%
-	# 		arrange(year_n) %>%
-	# 		group_by(year_n) %>%
-	# 		# mutate(year_over_year = sales / lag(sales)) %>%
-	# 		summarise(
-	# 			sales_median = median(sales, na.rm=TRUE),
-	# 			year_over_year_growth_median = median( year_over_year, na.rm=TRUE),
-	# 			year_over_year_growth_mean = mean( year_over_year, na.rm=TRUE),
-	# 			n = n()
-	# 			)
+	fin.sales.bal.or.year.zero <- fin.sales %>%
+		# filter for either having a balance or being the year before the loan
+		# filter(balance>0 | year_zero==Year) %>% 
+		group_by(account) %>%
+		arrange(Year) %>%
+		mutate(year_n = Year - year_zero) %>% # counter of years borrowing (0 = year_zero)
+		# mutate(year_n = row_number() - 1 ) %>% # counter of years borrowing (0 = year_zero)
+		mutate(year_over_year = (sales / lag(sales)) - 1 )	%>%
+		mutate(year_over_year = replace(year_over_year, is.infinite(year_over_year), NA)) %>%
+		ungroup() 
+	growth_by_years <- fin.sales.bal.or.year.zero %>%
+			arrange(year_n) %>%
+			group_by(year_n) %>%
+			# mutate(year_over_year = sales / lag(sales)) %>%
+			summarise(
+				sales_median = median(sales, na.rm=TRUE),
+				year_over_year_growth_median = median( year_over_year, na.rm=TRUE),
+				year_over_year_growth_mean = mean( year_over_year, na.rm=TRUE),
+				n = n()
+				)
 
-	# version including years before loan:
-	# yr.graph <- ggplot(filter(growth_by_years, year_n >= -3), 
-	# 	aes(x=year_n, y=year_over_year_growth_median, label=pct_labels[4:length(pct_labels)]))
-	# yr.gr <- yr.graph + geom_point(alpha=0.35, color='blue') + 
-	# 	geom_text(check_overlap = TRUE, hjust = 0, nudge_x = 0.10) +
-	# 	# ggtitle('Growth by # of Years as Client') +
-	# 	geom_line(alpha=0.2, color='blue') +
-	# 	scale_y_continuous('Year over year growth rate, median (percent)', labels=scales::percent) 
-	# yr.gr
+	version including years before loan:
+	yr.graph <- ggplot(filter(growth_by_years, year_n >= -3), 
+		aes(x=year_n, y=year_over_year_growth_median, label=pct_labels[4:length(pct_labels)]))
+	yr.gr <- yr.graph + geom_point(alpha=0.35, color='blue') + 
+		geom_text(check_overlap = TRUE, hjust = 0, nudge_x = 0.10) +
+		# ggtitle('Growth by # of Years as Client') +
+		geom_line(alpha=0.2, color='blue') +
+		scale_y_continuous('Year over year sales growth, median (percent)', labels=scales::percent) 
+	yr.gr
 
 #---------------------------------------------
 

@@ -53,6 +53,8 @@ library(ggplot2)
 	fin$balance[is.na(fin$balance)] <- 0 # NA balances from merge to zero
 
 # Determine if active during Year
+
+
 	fin <- fin %>%
 		group_by(RC.Account.Number, Year) %>%
 		mutate(bal = sum(balance, na.rm = TRUE)) %>%
@@ -96,10 +98,11 @@ library(ggplot2)
 # write.csv(to_faina_filter, 'sem_comparison.csv')
 # file.show('sem_comparison.csv')	
 
+
+	finx <- fin
 #--------------------------------------------------------------------------------------
 	# subset data
 
-	finx <- fin
 # select columns
 	fin <- select(finx, Year, sales = sales_a, 
 		account     = Account.Name, 
@@ -137,7 +140,7 @@ library(ggplot2)
  				years_active = last_year - year_one
  				)
 
- 	y1 <- select(y1, account, Year, year_one, last_year)
+ 	y1 <- select(y1, account, Year, year_one, last_year, years_active)
  	fin <- merge(fin, y1, by=c('account', 'Year'), all.x=TRUE)
 
 
@@ -178,16 +181,29 @@ library(ggplot2)
 	# function to calculate the row over previous row growth rate of x			
 	gro_rate <- function(x) {x/lag(x)  }
 
-		 cagrs <- fin.sales %>%
-		 	arrange(account, Year) %>%
-		 	fill(year_zero, .direction='up') %>%
-		 	fill(account, .direction='up') %>%
-		 	filter(Year==year_zero | Year==max_sales_year) %>%
-		 	arrange(account, Year) %>%
-		 	group_by(account) %>%
-		 	mutate(growth_sales = gro_rate(sales) - 1) %>%
-		 	mutate(growth_purchases = gro_rate(purchases) - 1) %>%
-		 	mutate(sales_cagr = (growth_sales + 1) ^ (1 / (max_sales_year - year_zero)) - 1)
+	 cagrs <- fin.sales %>%
+	 	arrange(account, Year) %>%
+	 	fill(year_zero, .direction='up') %>%
+	 	fill(account, .direction='up') %>%
+	 	filter(Year==year_zero | Year==max_sales_year) %>%
+	 	arrange(account, Year) %>%
+	 	group_by(account) %>%
+	 	mutate(growth_sales = gro_rate(sales) - 1) %>%
+	 	mutate(growth_purchases = gro_rate(purchases) - 1) %>%
+	 	mutate(sales_cagr = (growth_sales + 1) ^ (1 / (max_sales_year - year_zero)) - 1)
+
+
+	 cagrs_before <- fin.sales %>%
+	 	# arrange(account, Year) %>%
+	 	# fill(year_zero, .direction='up') %>%
+	 	# fill(account, .direction='up') %>%
+	 	# filter(balance == 0) %>%
+	 	arrange(account, Year) %>%
+	 	group_by(account) %>%
+	 	filter(Year==year_zero | Year==min(Year)) %>%
+	 	mutate(growth_sales = gro_rate(sales) - 1) %>%
+	 	mutate(growth_purchases = gro_rate(purchases) - 1) %>%
+	 	mutate(sales_cagr = (growth_sales + 1) ^ (1 / (year_zero - min(Year))) - 1)
 
 # summaries of clients with multiple years of loans
 	# multi <- filter(growth, years_of_sales_data>3, !is.infinite(sales_growth), sales_growth<=100)
