@@ -24,7 +24,6 @@ library(ggplot2)
 				gather(Year, revenue_alex, rev_1996:rev_2014)
 		rev_alex_long$Year <- as.numeric(gsub('rev_', '', rev_alex_long$Year))
 
-
 # load SEM rev and purchase data
 		# https://rootcapital.my.salesforce.com/00O70000004xeLC
 		# add RC Account Number field
@@ -35,7 +34,7 @@ library(ggplot2)
 			revenue_sem = Enterprise.Revenue..USD.,
 			payments_sem = Payments.to.Producers..USD.) 
 
-# read client financials		
+# read client financials data	
 	wd <- "C:/Box Sync/Risk Appetite - Provisioning Project/Working Folders for RAP Modules/Risk Profile/PD Model/3.Outputs"
 	setwd(wd)
 	filename <-  "rap_data_Q4_15_05.24.16.csv"
@@ -46,15 +45,34 @@ library(ggplot2)
 # merge various sources of sales and purchases   --->  df.rev
 	df.rev <- merge(x=df.rap, y=rev_alex_long, by=c('Account.Name', 'Year'), all.x=TRUE, all.y=TRUE)
 	df.rev <- merge(x=df.rev, y=rev_sem, by=c('Account.Name', 'Year'), all.x=TRUE, all.y=TRUE)
-
 	fin <- merge(bal, df.rev, by=c('Account.Name', 'Year'), all=TRUE)  # 3894 with all.x, 40856 with all
-	
+
+# read loan characteristics
+		# careful, this is loan level and fin is client level
+	 	lc_filename <- 'https://rootcapital.box.com/shared/static/gme71utefwvj48i3t3jia5iaqdgplh2f.csv'
+	 	lc <- read.csv(lc_filename)
+	 	names(lc)[9] <- 'account'
+	 	names(lc)[5] <- 'LoanID'
+	 	cc <- filter(lc, !duplicated(account))
+	 	fin <- merge(fin, lc, by = 'account', all.x = TRUE)
+
+# remove duplicates of Year/account
+	fin <- fin %>%
+		distinct(Year, account, .keep_all = TRUE)
+
 # merge balance by time, and financial data, on Year and Account (and loanID) --->  fin
 	fin$balance[is.na(fin$balance)] <- 0 # NA balances from merge to zero
 
+# find peak balance of loan
+	fin <- fin %>%
+		group_by(RC.Opp.Number) %>%
+		mutate(balance = max(balance, na.rm = TRUE),
+			loan_size50_500 = ifelse(balance >= 5e4 & balance <= 5e5, TRUE, FALSE),
+			loan_size50_150 = ifelse(balance >= 5e4 & balance <= 1.5e5, TRUE, FALSE)
+			) %>%
+		ungroup()
+
 # Determine if active during Year
-
-
 	fin <- fin %>%
 		group_by(RC.Account.Number, Year) %>%
 		mutate(bal = sum(balance, na.rm = TRUE)) %>%
@@ -85,32 +103,19 @@ library(ggplot2)
 # remove years with no active balance & no data
 	fin <- filter(fin, !(active==FALSE & is.na(Sales) & is.na(revenue_alex) & is.na(payments_sem)))
 
-# Write output for faina
-# to_faina <- select(fin, Account.Name, RC.Account.Number, active, Year,
-# 	Sales, Total.Income, revenue_alex, revenue_sem, 
-# 	Purchases.from.producers, Total.COGS, payments_sem)
-
-# to_faina_filter <- filter(to_faina, !(active==FALSE & is.na(Sales) & is.na(revenue_alex) & is.na(payments_sem)))
-
-# # omitted:
-# omitted <- filter(to_faina, active==FALSE & is.na(Sales) & is.na(revenue_alex) & is.na(payments_sem))
-
-# write.csv(to_faina_filter, 'sem_comparison.csv')
-# file.show('sem_comparison.csv')	
-
-
-	finx <- fin
+	finx <- fin # save in case needed later
 #--------------------------------------------------------------------------------------
 	# subset data
 
 # select columns
-	fin <- select(finx, Year, sales = sales_a, 
+	fin <- select(finx, Year, 
+		sales = sales_a, 
 		account     = Account.Name, 
 		purchases   = Purchases.from.producers,
 		purchases_a = purchases_a,
 		total_cogs  =Total.COGS,
 		amount      = Amount,
-		active, balance, payments_sem)
+		active, balance, payments_sem, loan_size50_500, loan_size50_150)
 
 # Create summary stats
 		sales_sum <- fin %>%
@@ -125,7 +130,7 @@ library(ggplot2)
 
 # data completeness checks
 	sum(is.na(fin$sales)) / dim(fin)[1]				   # percent missing sales
-	sum(is.na(fin$sales[fin$balance>0])) / dim(fin[fin$balance>0])[1] # percent missing sales when there was a balance
+	# sum(is.na(fin$sales[fin$balance>0])) / dim(fin[fin$balance>0])[1] # percent missing sales when there was a balance
 	sum(fin$sales==0, na.rm=TRUE)                      # number with zero sales
 	sum(fin$sales==0 & fin$balance>0, na.rm=TRUE)      # number with zero sales and a balance
 
@@ -170,6 +175,19 @@ library(ggplot2)
 	    # remove other year calc cols
 	    fin <- select(fin, -c(year_one, min_sales_year))
 
+
+# growth rates
+  fin <- fin %>%
+		group_by(account) %>%
+		arrange(Year) %>%
+		mutate(sales_growth_yoy = (sales / lag(sales)) - 1 )	%>%
+		mutate(sales_growth_yoy = replace(sales_growth_yoy, is.infinite(sales_growth_yoy), NA),
+			year_n = Year - year_zero) %>%
+		ungroup() 
+
+
+  
+# subset for having sales, or having a balance
 	fin.sales <- fin %>%
 				filter(!is.na(sales)) %>%
 				arrange(account, Year) %>%
@@ -206,10 +224,22 @@ library(ggplot2)
 	 	mutate(sales_cagr = (growth_sales + 1) ^ (1 / (year_zero - min(Year))) - 1)
 
 # summaries of clients with multiple years of loans
-	# multi <- filter(growth, years_of_sales_data>3, !is.infinite(sales_growth), sales_growth<=100)
-	# multi_hi <- filter(growth, years_of_sales_data>3, is.infinite(sales_growth) | sales_growth>100)
-	# summary(multi$years_of_sales_data)
-	# summary(multi$sales_CAGR)
-	# summary(multi$sales_growth)
-	# sum(!duplicated(multi$account))
+	multi.cagrs <- filter(cagrs, years_of_sales_data>4, !is.infinite(growth_sales), growth_sales<=100)
+	multi.cagrs_hi <- filter(cagrs, years_of_sales_data>4, is.infinite(growth_sales) | growth_sales>100)
+	summary(multi.cagrs$years_of_sales_data)
+	summary(multi.cagrs$sales_cagr)
+	summary(multi.cagrs$growth_sales)
+	sum(!duplicated(multi.cagrs$account))
 
+
+# write
+	wd <- 'c:/Box Sync/jlittel/comms/client financials/data'
+	setwd(wd)
+	write.csv(fin, 'fin.csv')
+
+
+
+
+
+ cagrs.plot <- ggplot(cagrs, aes(x = log(sales), y = log(growth_sales))) + geom_point()	
+ cagrs.plot

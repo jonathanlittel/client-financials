@@ -49,6 +49,7 @@
 # impute missing data by rolling forward previous period to all future missing periods
 	impute <- fin %>%
 			group_by(account) %>%
+			mutate(sales_pre_impute = sales) %>%
 			fill(sales, purchases, total_cogs) %>%
 			ungroup()
 

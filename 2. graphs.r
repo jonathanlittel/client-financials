@@ -54,15 +54,15 @@ growth_summary
 #--------------------------------------------
 # Median growth by # years as root client
 #--------------------------------------------
-	fin.sales.bal.or.year.zero <- fin.sales %>%
-		filter(balance>0 | year_zero==Year) %>% # switch to include years before loan
-		group_by(account) %>%
-		arrange(Year) %>%
-		# mutate(year_n = Year - year_zero) %>% # switch to include years before loan
-		mutate(year_n = row_number() - 1 ) %>% # counter of years borrowing (0 = year_zero)
-		mutate(sales_growth_yoy = (sales / lag(sales)) - 1 )	%>%
-		mutate(sales_growth_yoy = replace(sales_growth_yoy, is.infinite(sales_growth_yoy), NA)) %>%
-		ungroup() 
+	# fin.sales.bal.or.year.zero <- fin.sales %>%
+		# filter(balance>0 | year_zero==Year) %>% # switch to include years before loan
+		# group_by(account) %>%
+		# arrange(Year) %>%
+		# # mutate(year_n = Year - year_zero) %>% # switch to include years before loan
+		# mutate(year_n = row_number() - 1 ) %>% # counter of years borrowing (0 = year_zero)
+		# mutate(sales_growth_yoy = (sales / lag(sales)) - 1 )	%>%
+		# mutate(sales_growth_yoy = replace(sales_growth_yoy, is.infinite(sales_growth_yoy), NA)) %>%
+		# ungroup() 
 
 	growth_by_years <- fin.sales.bal.or.year.zero %>%
 			arrange(year_n) %>%
@@ -74,6 +74,9 @@ growth_summary
 				year_over_year_growth_mean = mean( sales_growth_yoy, na.rm=TRUE),
 				n = n()
 				)
+
+
+			
     # boxplot and point ----------------------------------------------------
 	# yr.graph <- ggplot(filter(fin.sales.bal.or.year.zero, year_over_year<5, year_over_year>-1.5, !is.na(year_over_year)),
 	#  aes(x=year_n, y=year_over_year))
