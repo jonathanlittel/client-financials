@@ -61,7 +61,9 @@ loans <- loans %>% group_by(RC.Opp.Number) %>% mutate(sales_lag = lag(sales,1, o
 loans$sales_lag_log <- log(loans$sales_lag + 1)
 loans$pd2 <- predict(glm.simple.pd, loans, type='response')
 loans$pd2 <- ifelse(is.na(loans$pd), loans$pd2, loans$pd)
+# recode loans below 7% (presumably lowered at-risk rates) or about 14% (presumably fx rates)
 loans$interest_rate_pred <- ifelse(loans$Internal.Interest.Rate..../ 100 < 0.07, 0.07, loans$Internal.Interest.Rate.... / 100)
+loans$interest_rate_pred <- ifelse(loans$Internal.Interest.Rate..../ 100 > 0.14, 0.10, loans$interest_rate_pred )
 loans <- mutate(loans,revenue_predicted = balance * 0.7 * Loan.Tenor/12 * interest_rate_pred )
 plot(loans$revenue - loans$revenue_predicted)
 loans$revenue_ <- ifelse(loans$WriteoffsDummy == 1 | loans$revenue < 0, loans$revenue_predicted, loans$revenue)
@@ -76,6 +78,7 @@ loans <- loans %>%
     el  = balance * pd2 * ead * lgd,
     revenue_less_risk = revenue_ - el
   )
+
 # quantile(loans_c$revenue_less_risk, probs = seq(0, 1, by = 0.01), na.rm = TRUE)
 # robbie: use what have for collateral, then LoC are unsecured, capex are secured
 # term EAD is 64% of max exposure, loc is 54%

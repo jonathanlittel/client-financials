@@ -1,8 +1,11 @@
+# note: requires source('txns from sf.r') first, to load tx2, which is transaction and balance reports from SF
+
 library(dplyr)
 library(lubridate)
 library(tidyr)
 library(ggplot2)
 library(readxl)
+library(readr)
 
 # --------------------------------------------------------
 # LOAD AND PREPARE DATA
@@ -12,10 +15,16 @@ library(readxl)
 # https://rootcapital.my.salesforce.com/00O700000054Uu2
   wd <- 'c:/Box Sync/jlittel/comms/client financials/data'
   setwd(wd)
-  bal <- read.csv('SF_balances_by_date_08.22.16.csv')
-  bal <- select(bal, LoanID=Loan.ID, RC.Account.Number=RC.Account.Number, Account.Name=Account.Name,
-    RC.Opp.Number = RC.Opp.Number,
-    balance=Internal.Outstanding.Principal, date=Date)
+  # bal <- read.csv('SF_balances_by_date_08.22.16.csv')
+  # bal <- select(bal, LoanID=Loan.ID, RC.Account.Number=RC.Account.Number, Account.Name=Account.Name,
+  #               RC.Opp.Number = RC.Opp.Number,
+  #               balance=Internal.Outstanding.Principal, date=Date)
+  # 
+  bal <- read_csv('SF_balances_by_date_08.22.16.csv')
+  bal <- select(bal, LoanID=`Loan ID`, RC.Account.Number=`RC Account Number`, Account.Name=`Account Name`,
+                RC.Opp.Number = `RC Opp Number`,
+                balance=`Internal Outstanding Principal`, date=Date)
+  
   bal$date <- as.Date(as.character(bal$date), format='%m/%d/%Y')
   bal$Year <- as.numeric(year(bal$date))
 # Determine if active during Year
@@ -54,20 +63,24 @@ library(readxl)
     select(RC.Account.Number, LoanID, loan_count, loan_number)  %>% # Year
     inner_join(bal, by = c('LoanID', 'RC.Account.Number'))  # loan level info
       
-# variables for client's first loan
+# variables for client's first loan-year
   bal3 <- bal2 %>%
     group_by(RC.Account.Number) %>%
-    filter(Year == min(Year)) %>%
-    distinct(Year, LoanID, .keep_all = TRUE) %>%
-    mutate(balance_first = balance,
+    # filter(Year == min(Year)) %>%
+    filter(date == min(date)) %>%
+    distinct(Year, RC.Opp.Number, .keep_all = TRUE) %>%
+    # summarize(
+    #   balance_first = sum(balance, na.rm = TRUE)
+    # ) %>%
+    mutate( balance_first = balance,
     	loan_size_cat = ifelse(balance_first >= 5e4 & balance_first <= 5e5, '50k-500k',
     		ifelse(balance_first < 5e4, '<50k',
     			ifelse(balance_first > 5e5, '>500k', NA)))
     	) %>%
     mutate(
-    	loan_size_cat_scott = ifelse(balance_first >= 5e4 & balance_first <= 1.5e5, '50k-150k',
+    	loan_size_cat_scott = ifelse(balance_first >= 5e4 & balance_first <= 2e5, '50k-200k',
     		ifelse(balance_first < 5e4, '<50k',
-    			ifelse(balance_first > 1.5e5, '>150k', NA)))
+    			ifelse(balance_first > 2e5, '>200k', NA)))
     	) %>%    
     distinct(Year, RC.Account.Number, .keep_all = TRUE) %>%
     select(RC.Account.Number, balance_first:loan_size_cat_scott) %>%
@@ -79,7 +92,8 @@ dim(bal3) == dim(bal2)      # should be TRUE FALSE
 
 # filter to one row per RC.Opp.Number and Year
   bal4 <- distinct(bal3, RC.Opp.Number, Year, .keep_all = TRUE) %>%
-    select(-date, -bal)
+    select(-date)
+  sum(duplicated(bal4[,c('RC.Opp.Number', 'Year')])) 
   
 # Replace NAs function
   replace_na <- function(x, replacement = 0) {
@@ -125,7 +139,7 @@ dim(bal3) == dim(bal2)      # should be TRUE FALSE
   setwd(wd)
   filename <-  "rap_data_Q4_15_05.24.16.csv"
   df.rap <- read.csv(filename, header=TRUE, sep=",")
-  client_fin <- select(df.rap, RC.Account.Number, Year, Sales, Purchases.from.producers, Total.COGS, Total.Income)
+  client_fin <- select(df.rap, RC.Opp.Number, RC.Account.Number, Year, Sales, Purchases.from.producers, Total.COGS, Total.Income)
   wd <- 'c:/Box Sync/jlittel/comms/client financials/'
   # setwd(wd)
     pd_loc <- 'https://rootcapital.box.com/shared/static/jpklpygf1n0se6axtjljz978w41mm3uv.csv'
@@ -161,26 +175,61 @@ dim(bal3) == dim(bal2)      # should be TRUE FALSE
 	 	setdiff(bal3$RC.Opp.Number, tx2$RC.Opp.Number)  # check that everything will match
 	 	setdiff(tx2$RC.Opp.Number, bal3$RC.Opp.Number)  # check that everything will match
 	 	 # these must be loans that never had a month end balance?
-	 	
-	 	m2a <- full_join(m1a, sems, by = c('RC.Account.Number', 'Year'))
-	 	apply(m2a, 2, function(x) sum(is.na(x)))
-	 	apply(sems, 2, function(x) sum(is.na(x)))
-	 	sum(!duplicated(m2a[,c('RC.Account.Number', 'Year')]),na.rm = TRUE)
+	 	# 
+	 	# m2a <- full_join(m1a, sems, by = c('RC.Account.Number', 'Year'))
+	 	# apply(m2a, 2, function(x) sum(is.na(x)))
+	 	# apply(sems, 2, function(x) sum(is.na(x)))
+	 	# sum(!duplicated(m2a[,c('RC.Account.Number', 'Year')]),na.rm = TRUE)
+	 	m2a <- m1a
 	 	m3a <- left_join(m2a, pds, by = 'RC.Opp.Number')
     m4a <- left_join(m3a, client_char, by = 'RC.Account.Number')
     m5a <- left_join(m4a, wo, by = 'LoanID')
-    m6a <- left_join(m5a, client_fin, by = c('RC.Account.Number', 'Year'))
+    m6a <- left_join(m5a, client_fin, by = c('RC.Opp.Number', 'RC.Account.Number', 'Year'))
+    m7a <- full_join(m6a, sems, by = c('RC.Account.Number', 'Year'))
     dim(m5a) - dim(m6a)
-    loans <- m6a
+    dim(m7a)
+    loans <- m7a
 
+    # check for duplicate rows
+    sum(duplicated(loans[,c('RC.Opp.Number', 'Year')])) -
+    sum(is.na(loans$RC.Opp.Number)) - sum(is.na(loans$Year)) # need to account for spots where both are na
+    
+    
+    # # --------------------------------------------------------
+    # # MERGE    bal3, df.rap, client_char, tx2, wo  pds??     ##rev_alex_long, rev_sem, 
+    # 
+    # m1a <- full_join(x = bal4, y = tx3, by = c('RC.Opp.Number', 'Account.Name', 'RC.Account.Number')) # Account.Name converted to char
+    # setdiff(bal3$RC.Opp.Number, tx2$RC.Opp.Number)  # check that everything will match
+    # setdiff(tx2$RC.Opp.Number, bal3$RC.Opp.Number)  # check that everything will match
+    # # these must be loans that never had a month end balance?
+    # 
+    # m2a <- full_join(m1a, sems, by = c('RC.Account.Number', 'Year'))
+    # apply(m2a, 2, function(x) sum(is.na(x)))
+    # apply(sems, 2, function(x) sum(is.na(x)))
+    # sum(!duplicated(m2a[,c('RC.Account.Number', 'Year')]),na.rm = TRUE)
+    # m3a <- left_join(m2a, pds, by = 'RC.Opp.Number')
+    # m4a <- left_join(m3a, client_char, by = 'RC.Account.Number')
+    # m5a <- left_join(m4a, wo, by = 'LoanID')
+    # m6a <- left_join(m5a, client_fin, by = c('RC.Account.Number', 'Year'))
+    # dim(m5a) - dim(m6a)
+    # loans <- m6a
+    # 
+    
+    
 # --------------------------------------------------------
 # NEW VARIABLES
 
 	loans$balance[is.na(loans$balance)] <- 0
+  loans$WriteoffsDummy <- replace_na(loans$WriteoffsDummy, 0)
+
+# consolidate sem and FS data sources
   loans$sales <- ifelse(is.na(loans$Sales), loans$sales_sem, loans$Sales)
   loans$Sales <- NULL
   loans$sales_sem <- NULL
-  loans$WriteoffsDummy <- replace_na(loans$WriteoffsDummy, 0)
+  loans$payments_to_producers <- ifelse(is.na(loans$payments_to_producers), 
+                  loans$Purchases.from.producers, loans$payments_to_producers)
+  loans$Purchases.from.producers <- NULL
+  
   	# clients <- clients %>%
 	# 		mutate(
 	# 			sales_a = ifelse(
@@ -202,59 +251,80 @@ dim(bal3) == dim(bal2)      # should be TRUE FALSE
  			mutate(
  				year_one = min(Year),
  				year_last = max(Year),
- 				years_active = year_last - year_one,
  				year_zero = year_one - 1,
- 				year_of_loan = Year - year_zero
+ 				years_active = year_last - year_zero			
+ 				# year_of_loan = Year - year_zero
  				) %>%
- 	    select(RC.Account.Number, year_one:year_of_loan) %>%
+ 	    select(RC.Account.Number, year_one:years_active) %>%
  	  distinct(RC.Account.Number, .keep_all = TRUE) %>%
  	  full_join(loans, by = c('RC.Account.Number'))
 
 # find loan-year yoy sales growth
  	loans <- loans %>%
  	  group_by(RC.Opp.Number) %>%
- 	  mutate(sales_growth_yoy = sales / ( lag(sales) - 1)) %>%
+ 	  arrange(Year) %>%
+ 	  mutate(sales_growth_yoy = sales / ( lag(sales) - 1)) %>%  # but really should do this again at client
+ 	                                                            # some Opps won't have previous year (and are different #s..)
  	  ungroup()
  	
-# find first and last years of sales data
-# loans <- loans %>%
-# 	 	filter(!is.na(sales)) %>%
-# 	 	group_by(RC.Account.Number) %>%
-# 	 	mutate(
-# 	 	  min_sales_year = min(Year), 
-# 	 	  max_sales_year = max(Year)
-#           ) %>%
-#     select(RC.Account.Number, min_sales_year, max_sales_year) %>%
-#  	  distinct(RC.Account.Number, .keep_all = TRUE) %>%
-#  	  full_join(loans, by = c('RC.Account.Number')) %>%
-#     ungroup()
-
+ # fill in sems and client level characteristics
 loans <- loans %>%
   group_by(RC.Account.Number) %>%
-  fill(processing_type, .direction = c('down', 'up')) 
-	
+  fill(processing_type, rc_first, producers, payments_to_producers, .direction = c('down', 'up')) 
+
+
+  # remove duplicate rows... 110317 had two rows for 2005 at same loan id.. (?)
+    # different sales #s (had two LoanIDs with different sales #s for that year)
+  
+  
+  source('C:/Box Sync/jlittel/comms/client financials/simple pd model.r')
+
+
+# prep revenue to get one rev/el/net per loan
+rev_temp <- loans %>%
+  # filter(Year == year_one) %>%   # to avoid counting for multiple years - but leaves only year_n...
+  group_by(RC.Opp.Number) %>%
+  filter(Year == min(Year)) %>%
+  distinct(RC.Opp.Number, .keep_all = TRUE) %>% # this should be redundant with above line...
+  ungroup() %>%
+  group_by(RC.Account.Number, Year) %>%
+  summarise(
+    revenue_          = sum(revenue_, na.rm=TRUE),
+    el                = sum(el, na.rm=TRUE),
+    revenue_less_risk = sum(revenue_less_risk, na.rm=TRUE)
+    ) %>%
+  select(RC.Account.Number, Year, revenue_less_risk, revenue_est = revenue_, expected_loss = el) %>%
+  distinct(RC.Account.Number, Year, .keep_all = TRUE)
+
+
 	#--------- PREP OUTPUT -------------------------------------------
 
 	 # remove duplicates of Year/Loan and fill in the blanks for RC.Account.Number
 	 # note that revenue etc won't work
 	   clients <- loans %>%
 	      group_by(RC.Account.Number, Year) %>%
-	      fill(sales, .direction = c("down", "up")) %>%
+	      fill(sales, producers, rc_first, hectares, payments_to_producers, wages, .direction = c("down", "up")) %>%
 	      distinct(Year, RC.Account.Number, .keep_all = TRUE) %>%
-	      mutate(balance = sum(balance, na.rm = TRUE)) %>%
-	      select(RC.Account.Number:active_today, Lending.Region, rc_first, producers,
-	             sales:Internal.Interest.Rate...., processing_type, -LoanID) %>% # note that these are loan level
+	      mutate(balance = sum(balance, na.rm = TRUE), pd_mean = mean(pd, na.rm = TRUE)) %>%
+	      select(RC.Account.Number:active_today, Lending.Region, rc_first, producers, payments_to_producers, wages,
+	             sector = Sector.and.Perishability,
+	             revenue:Internal.Interest.Rate...., processing_type, sales, # sales_growth_yoy,
+	             -LoanID) %>% # careful about going from loan to client
 	      select(-RC.Opp.Number) %>%
 	     ungroup()
 	   
-	   # clients$sales <- NULL
-	   # # add sales (since the above distinct filter is removing loans-sales-years arbitrarily)
-	   # clients2 <- loans %>%
-	   #   filter(!is.na(sales)) %>%
-	   #   select(RC.Account.Number, Year, sales) %>%
-	   #   distinct(RC.Account.Number, Year, .keep_all = TRUE) %>%
-	   #   right_join(clients, by = c('RC.Account.Number', 'Year'))
+	   clients <- left_join(clients, rev_temp, by = c('RC.Account.Number', 'Year'))
+
 	   
+	   
+	   # fill in some things 
+	   clients <- clients %>%
+	     group_by(RC.Account.Number) %>% 
+	     fill(sector, processing_type, active_today, rc_first, balance_first, 
+	          loan_size_cat, loan_size_cat_scott, loan_count, Account.Name, .direction = c('down', 'up'))
+	   
+	   
+	   clients$active_year[is.na(clients$active_year)] <- FALSE
 	   # growth rates
 	   clients <- clients %>%
 	     group_by(RC.Account.Number) %>%
@@ -276,7 +346,7 @@ loans <- loans %>%
 	     distinct(RC.Account.Number, years_of_sales_data) %>%
 	     right_join(clients, by = 'RC.Account.Number') 
 	   
-	   clients <- clients%>%
+	   clients <- clients %>%
 	     filter(Year >= year_zero, !is.na(sales) ) %>%
 	     arrange(RC.Account.Number, Year) %>%
 	     group_by(RC.Account.Number)  %>%
@@ -326,40 +396,10 @@ loans <- loans %>%
 	     filter(active_year==TRUE, Year < 2015) %>%
 	     summarise(
 	       attrition_rate_loan = 1 - (sum(subsequent_loan, na.rm = TRUE) / sum(loan_number>0, na.rm = TRUE)),
-	       n = n())
-	   
-	   # clients_afr <- filter(clients, Lending.Region %in% c('WAF', 'EAF'), active_year == TRUE)
-
-	   # clients_afr <- clients_afr %>%
-	   #   group_by(RC.Account.Number) %>%
-	   #   arrange(Year) %>%
-	   #   mutate(sales_fill = sales) %>%
-	   #   fill(sales_fill, .direction = c('down'))
-
-	   # sum(clients_afr$sales, na.rm = TRUE)
-	   # write.csv(clients_afr, 'client_year_africa_data2.csv')
-	   
-	   # # select columns
-	   # clients <- rename(clients, 
-	   #                   sales = sales_a, 
-	   #                   account     = RC.Account.Number, 
-	   #                   purchases   = Purchases.from.producers,
-	   #                   payments_to_producers = payments_to_producers,
-	   #                   total_cogs  = Total.COGS)
-	   # 
-	   # Check number of unique clients in set
-	   n_accounts <- sum(!duplicated(clients$account))
-	   n_account_year <- sum(!duplicated(clients[,c('account', 'Year')])) # by client/year
-	   
-	   # data completeness checks
-	   sum(is.na(clients$sales)) / dim(clients)[1]				   # percent missing sales
-	   # sum(is.na(fin$sales[fin$balance>0])) / dim(fin[fin$balance>0])[1] # percent missing sales when there was a balance
-	   sum(clients$sales==0, na.rm=TRUE)                      # number with zero sales
-	   sum(clients$sales==0 & clients$balance>0, na.rm=TRUE)      # number with zero sales and a balance
-	   
-
-
-
+	       n = n(),
+	       pd_median = median(pd, na.rm = TRUE),
+	       wo_mean = mean(WriteoffsDummy, na.rm = TRUE)
+	       )
 	
 #------------------------------------
 # MORE THINGS
@@ -374,40 +414,39 @@ loans <- loans %>%
 	     right_join(clients, by = 'RC.Account.Number')
 	   
 	   clients <- clients %>%
-	     filter(Year == year_zero | Year == max_sales_year) %>%
+	     filter(Year == year_zero | Year == max_sales_year) %>%      # note that this won't work perfectly for pmts and such
 	     group_by(RC.Account.Number) %>%
 	     arrange(Year) %>%
 	     mutate(sales_growth = (sales / lag(sales, 1) - 1),
-	            sales_cagr   = (sales_growth + 1)^(1/(max_sales_year - year_zero)) - 1) %>%
+	            sales_cagr   = (sales_growth + 1)^(1/(max_sales_year - year_zero)) - 1,
+	            payments_growth = (payments_to_producers / lag(payments_to_producers, 1) - 1),
+	            producers_growth = (producers / lag(producers, 1) - 1)
+	            ) %>%
 	     # distinct(RC.Account.Number, sales_growth, sales_cagr, .keep_all = TRUE) %>%
 	     filter(!is.na(sales_growth)) %>%
-	     select(RC.Account.Number, sales_growth, sales_cagr) %>%
+	     select(RC.Account.Number, sales_growth, sales_cagr, payments_growth, producers_growth) %>%
 	     right_join(clients, by = 'RC.Account.Number')
-	            
+	   
+	   clients$cagr_animal <- cut(clients$sales_cagr,
+	                                c(-Inf, 0, 0.20, Inf),
+	                                labels = c('panda', 'antelope', 'gazelle'))
+	   quantile(clients$sales_cagr, na.rm = TRUE, probs = seq(0, 1, by = 0.02))
+	   
+	   clients$growth_animal <- cut(clients$sales_growth,
+	                         c(-Inf, 0, 0.30, Inf),
+	                         labels = c('panda', 'antelope', 'gazelle'))
+	   
 
-# # summaries of clients with multiple years of loans
-# 	multi.cagrs <- filter(cagrs, years_of_sales_data>4, !is.infinite(growth_sales), growth_sales<=100)
-# 	multi.cagrs_hi <- filter(cagrs, years_of_sales_data>4, is.infinite(growth_sales) | growth_sales>100)
-# 	summary(multi.cagrs$years_of_sales_data)
-# 	summary(multi.cagrs$sales_cagr)
-# 	summary(multi.cagrs$growth_sales)
-# 	sum(!duplicated(multi.cagrs$account))
+# #------------------------------------
+# # PREDICT SIMPLE PD 
+# 	# load glm model object 'glm.sales' if needed
+	source('c:/Box Sync/jlittel/comms/client financials/simple pd model.r')
+# predict(glm.sales, DATAFRAME, type="prob")[,2]
 # 
-# table(clients$active_year, clients$sales>0)
-#------------------------------------
-# MERGE SALES + SEM WITH LOAN LEVEL TENOR TO PREDICT PD
-	
+# 
+# 
+# # write
+# wd <- 'c:/Box Sync/jlittel/comms/client financials/data'
+# setwd(wd)
+# write.csv(clients, 'clients.csv')
 
-#------------------------------------
-# PREDICT SIMPLE PD 
-	# load glm model object 'glm.sales' if needed
-	# source('c:/Box Sync/jlittel/comms/client financials/pd model sales.r')
-predict(glm.sales, DATAFRAME, type="prob")[,2]
-
-
-
-# write
-wd <- 'c:/Box Sync/jlittel/comms/client financials/data'
-setwd(wd)
-write.csv(clients, 'clients.csv')
-file.show('fin.csv')
