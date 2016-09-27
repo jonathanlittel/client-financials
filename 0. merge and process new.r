@@ -34,9 +34,9 @@ library(readr)
     ungroup() %>%
     group_by(RC.Account.Number, Year) %>%
     mutate(
-      bal_avg = mean(bal_sum, na.rm = TRUE),
-      bal_peak = max(bal_sum, na.rm = TRUE), 
-      active_year = bal_peak > 0
+      bal_avg_cl = mean(bal_sum, na.rm = TRUE),
+      bal_peak_cl = max(bal_sum, na.rm = TRUE), 
+      active_year = bal_peak_cl > 0
       ) %>%
     ungroup() %>%
     group_by(RC.Opp.Number) %>%
@@ -51,7 +51,9 @@ library(readr)
     mutate(
       months_outstanding = sum(bal_sum > 0),
       active_today = ifelse(date == '2016-08-31' & bal_sum > 0, 1, 0),      
-      balance = max(bal_sum, na.rm = TRUE)
+      # balance = max(balance, na.rm = TRUE),
+      bal_peak_loan = max(balance, na.rm = TRUE),
+      bal_avg_loan = mean(balance, na.rm = TRUE)
       # loan_size50_500 = ifelse(balance >= 5e4 & balance <= 5e5, TRUE, FALSE),
       # loan_size50_150 = ifelse(balance >= 5e4 & balance <= 1.5e5, TRUE, FALSE)
       ) %>%
@@ -82,10 +84,7 @@ library(readr)
     ungroup() %>%
     distinct(Year, RC.Opp.Number, .keep_all = TRUE) %>%
     group_by(RC.Account.Number) %>%   
-    # summarize(
-    #   balance_first = sum(balance, na.rm = TRUE)
-    # ) %>%
-    mutate( balance_first = bal_loan_peak,
+    mutate( balance_first = bal_loan_peak,    # bal_loan_peak
     	loan_size_cat = ifelse(balance_first >= 5e4 & balance_first <= 5e5, '50k-500k',
     		ifelse(balance_first < 5e4, '<50k',
     			ifelse(balance_first > 5e5, '>500k', NA)))
@@ -323,11 +322,11 @@ rev_temp <- loans %>%
 	   clients <- bal2 %>%
 	     group_by(RC.Account.Number, Year) %>%
   	   summarise(
-        bal_avg  = max(bal_avg, na.rm = TRUE),
-        bal_peak = max(bal_peak, na.rm = TRUE)
+        bal_avg_cl  = max(bal_avg_cl, na.rm = TRUE),
+        bal_peak_cl = max(bal_peak_cl, na.rm = TRUE)
         ) %>%
-  	   mutate(active_year       = bal_peak > 0 ) %>%
-	     select(RC.Account.Number, Year, bal_avg, bal_peak, active_year) %>%
+  	   mutate(active_year       = bal_peak_cl > 0 ) %>%
+	     select(RC.Account.Number, Year, bal_avg_cl, bal_peak_cl, active_year) %>%
 	     right_join(clients, by = c('RC.Account.Number', 'Year'))
 	   
 	   
@@ -405,7 +404,9 @@ rev_temp <- loans %>%
 	     summarise(
 	       attrition_rate = 1 - (sum(active_next_year, na.rm = TRUE) / sum(active_year, na.rm = TRUE)),
 	       n = n())
-	     
+	    attrition_rates_by_year_n50k
+
+
 	   # figure out if loan dropped out or *could* be active in a year
 	   attrition_rates_by_loan_by_year_n50k <- loans %>%
 	     group_by(RC.Account.Number) %>%
@@ -459,14 +460,6 @@ rev_temp <- loans %>%
 	                         labels = c('panda', 'antelope', 'gazelle'))
 	   
 
-# #------------------------------------
-# # PREDICT SIMPLE PD 
-# 	# load glm model object 'glm.sales' if needed
-	source('c:/Box Sync/jlittel/comms/client financials/simple pd model.r')
-# predict(glm.sales, DATAFRAME, type="prob")[,2]
-# 
-# 
-# 
 # # write
 # wd <- 'c:/Box Sync/jlittel/comms/client financials/data'
 # setwd(wd)

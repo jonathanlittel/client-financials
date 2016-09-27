@@ -364,6 +364,7 @@ attrition_rates_by_year_n50k
     
     # outcomes <- round(outcomes, 2)
     t(outcomes)
+    outcomes[-10] - outcomes_old
     
     setwd("C:/Box Sync/jlittel/comms/client financials/data")
     save.image(file = 'clientfin4.RData')

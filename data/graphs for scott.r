@@ -47,8 +47,3 @@ ggplot(filter(scott, balance < 5e5), aes(x = Year, y = balance, fill = Year==yea
   # geom_bar(alpha = .95, stat = 'identity', position = position_dodge(width=0.9), color = 'purple') +
   scale_y_continuous('Peak client balance', labels = scales::dollar) +
   theme_minimal() + scale_fill_brewer()    
-
-
-
-g = ggplot(unrate.df) + geom_line(aes(x=date, y=UNRATE)) + theme_bw()
-g = g + geom_rect(data=recessions.trim, aes(xmin=Peak, xmax=Trough, ymin=-Inf, ymax=+Inf), fill='pink', alpha=0.2)

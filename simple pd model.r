@@ -48,13 +48,13 @@ replace_na <- function(x, replacement = 0) {
 lc_cut <- select(lc, RC.Opp.Number, Loan.Tenor, Internal.Interest.Rate...., LoanID)
 n2 <- select(tx3, RC.Opp.Number, revenue) %>% left_join(lc_cut, by = 'RC.Opp.Number')
 n3 <- left_join(n2, wo, by = 'LoanID')
-df.rev <- select(bal4, RC.Opp.Number, bal_avg) %>%
+df.rev <- select(bal4, RC.Opp.Number, bal_avg_loan) %>%
   distinct(RC.Opp.Number, .keep_all = TRUE) %>%
   right_join(n3, by = 'RC.Opp.Number')
 df.rev$WriteoffsDummy <- replace_na(df.rev$WriteoffsDummy, 0)
 glimpse(df.rev)
 
-rev.lm <- lm(revenue ~ bal_avg + Loan.Tenor + Internal.Interest.Rate...., data = filter(df.rev, WriteoffsDummy == 0))
+rev.lm <- lm(revenue ~ bal_avg_loan + Loan.Tenor + Internal.Interest.Rate...., data = filter(df.rev, WriteoffsDummy == 0))
 
 revenue_predicted <- predict(rev.lm, df.rev, type = 'response')
 loans <- loans %>% group_by(RC.Opp.Number) %>% mutate(sales_lag = lag(sales,1, order_by = Year))
@@ -66,7 +66,7 @@ loans$interest_rate_pred <- ifelse(loans$Internal.Interest.Rate..../ 100 < 0.07,
 
 
 # predicted revenue is peak balance, times 75% usage, for the loan tenor, times the interest rate (which is adjusted if <7%)
-loans <- mutate(loans,revenue_predicted = bal_avg * 0.75 * Loan.Tenor/12 * interest_rate_pred )
+loans <- mutate(loans,revenue_predicted = bal_avg_loan * 0.75 * Loan.Tenor/12 * interest_rate_pred )
 plot(loans$revenue - loans$revenue_predicted)
 loans$revenue_ <- ifelse(loans$WriteoffsDummy == 1 | loans$revenue < 0, loans$revenue_predicted, loans$revenue)
 
@@ -77,7 +77,7 @@ loans <- loans %>%
   mutate(
     ead = ifelse(Loan.Type == 'Line of Credit', 0.64, 0.54),
     lgd = ifelse(Loan.Type == 'Capital Expenditure', 0.69, 0.90),
-    el  = bal_avg * pd2 * ead * lgd,
+    el  = bal_avg_loan * pd2 * ead * lgd,
     revenue_less_risk = revenue_ - el
   )
 
