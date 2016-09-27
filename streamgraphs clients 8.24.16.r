@@ -195,33 +195,3 @@ stream.vintage.2011
 #             sales_data_available = as.numeric(sum(!is.na(sales), na.rm = TRUE))) %>%
 #   gather(data_type, years, active_client_years:sales_data_available)
 # ggplot(completeness, aes(years, group = data_type, color = data_type)) + geom_bar(position = 'dodge')
-
-completeness <- clients %>%
-  group_by(RC.Account.Number) %>%
-  filter(active_year == TRUE) %>%
-  summarise(active_client_years = sum(active_year, na.rm = TRUE),
-            sales_data_available = as.numeric(sum(!is.na(sales), na.rm = TRUE)),
-            sales_data_avail_pct = sales_data_available / active_client_years) %>%
-  group_by(active_client_years) %>%
-  summarise(client_years = n(), average_sales_data_available = mean(sales_data_avail_pct, na.rm = TRUE))
-
-
-compl.plot <- ggplot(completeness, aes(x = active_client_years, y = average_sales_data_available, label = client_years)) + 
-  geom_bar(stat = "identity") + 
-  scale_y_continuous('Average available sales data', labels = scales::percent) +
-  geom_text(aes(label=client_years),hjust=0.5, vjust=1)
-compl.plot
-
-completeness.sales <- clients %>%
-  group_by(RC.Account.Number, year_one) %>%
-  filter(active_year == TRUE) %>%
-  summarise(active_client_years = sum(active_year, na.rm = TRUE),
-            sales_data_available = as.numeric(sum(!is.na(sales), na.rm = TRUE)),
-            sales_data_avail_pct = sales_data_available / active_client_years) %>%
-  group_by(sales_data_available, year_one) %>%
-  summarise(client_years = n())
-
-completeness.sales <- rename(completeness.sales, vintage_year = year_one) %>% mutate(vintage_year = factor(vintage_year))
-compl.sales.plot <- ggplot(completeness.sales, aes(x = sales_data_available, y = client_years, fill = vintage_year)) + 
-  geom_bar(stat = "identity") + scale_y_continuous('Number of clients') # + scale_fill_brewer(palette = 'YlOrBr')
-compl.sales.plot

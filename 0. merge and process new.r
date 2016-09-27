@@ -20,7 +20,7 @@ library(readr)
   #               RC.Opp.Number = RC.Opp.Number,
   #               balance=Internal.Outstanding.Principal, date=Date)
   # 
-  bal <- read_csv('SF_balances_by_date_08.22.16.csv')
+  bal <- read_csv('SF_balances_by_date_09.22.16.csv')
   bal <- select(bal, LoanID=`Loan ID`, RC.Account.Number=`RC Account Number`, Account.Name=`Account Name`,
                 RC.Opp.Number = `RC Opp Number`,
                 balance=`Internal Outstanding Principal`, date=Date)
@@ -29,18 +29,29 @@ library(readr)
   bal$Year <- as.numeric(year(bal$date))
 # Determine if active during Year
   bal <- bal %>%
+    group_by(RC.Account.Number, date) %>%
+    mutate(bal_sum = sum(balance, na.rm = TRUE)) %>%
+    ungroup() %>%
     group_by(RC.Account.Number, Year) %>%
-    mutate(bal = sum(balance, na.rm = TRUE)) %>%
-    mutate(active_year = bal>0) %>%
+    mutate(
+      bal_avg = mean(bal_sum, na.rm = TRUE),
+      bal_peak = max(bal_sum, na.rm = TRUE), 
+      active_year = bal_peak > 0
+      ) %>%
+    ungroup() %>%
+    group_by(RC.Opp.Number) %>%
+    mutate(bal_loan_peak = max(balance, na.rm = TRUE)) %>%
     ungroup()
+
   bal$bal <- NULL
+
 # find peak balance of loan
   bal <- bal %>%
     group_by(LoanID) %>%
     mutate(
-      months_outstanding = sum(balance > 0),
-      active_today = ifelse(date == '2016-07-31' & balance > 0, 1, 0),      
-      balance = max(balance, na.rm = TRUE)
+      months_outstanding = sum(bal_sum > 0),
+      active_today = ifelse(date == '2016-08-31' & bal_sum > 0, 1, 0),      
+      balance = max(bal_sum, na.rm = TRUE)
       # loan_size50_500 = ifelse(balance >= 5e4 & balance <= 5e5, TRUE, FALSE),
       # loan_size50_150 = ifelse(balance >= 5e4 & balance <= 1.5e5, TRUE, FALSE)
       ) %>%
@@ -68,11 +79,13 @@ library(readr)
     group_by(RC.Account.Number) %>%
     # filter(Year == min(Year)) %>%
     filter(date == min(date)) %>%
+    ungroup() %>%
     distinct(Year, RC.Opp.Number, .keep_all = TRUE) %>%
+    group_by(RC.Account.Number) %>%   
     # summarize(
     #   balance_first = sum(balance, na.rm = TRUE)
     # ) %>%
-    mutate( balance_first = balance,
+    mutate( balance_first = bal_loan_peak,
     	loan_size_cat = ifelse(balance_first >= 5e4 & balance_first <= 5e5, '50k-500k',
     		ifelse(balance_first < 5e4, '<50k',
     			ifelse(balance_first > 5e5, '>500k', NA)))
@@ -81,15 +94,19 @@ library(readr)
     	loan_size_cat_scott = ifelse(balance_first >= 5e4 & balance_first <= 2e5, '50k-200k',
     		ifelse(balance_first < 5e4, '<50k',
     			ifelse(balance_first > 2e5, '>200k', NA)))
-    	) %>%    
+    	) %>%
+    mutate(
+      loan_size_cat = factor(loan_size_cat),
+      loan_size_cat_scott = factor(loan_size_cat_scott)
+    ) %>%
     distinct(Year, RC.Account.Number, .keep_all = TRUE) %>%
-    select(RC.Account.Number, balance_first:loan_size_cat_scott) %>%
-    inner_join(bal2, by = 'RC.Account.Number') %>%
+    select(RC.Account.Number, balance_first, loan_size_cat, loan_size_cat_scott) %>%
+    right_join(bal2, by = 'RC.Account.Number') %>%
     ungroup()
 
 table(bal3$loan_size_cat)
 dim(bal3) == dim(bal2)      # should be TRUE FALSE
-
+dim(bal3)
 # filter to one row per RC.Opp.Number and Year
   bal4 <- distinct(bal3, RC.Opp.Number, Year, .keep_all = TRUE) %>%
     select(-date)
@@ -195,27 +212,6 @@ dim(bal3) == dim(bal2)      # should be TRUE FALSE
     sum(is.na(loans$RC.Opp.Number)) - sum(is.na(loans$Year)) # need to account for spots where both are na
     
     
-    # # --------------------------------------------------------
-    # # MERGE    bal3, df.rap, client_char, tx2, wo  pds??     ##rev_alex_long, rev_sem, 
-    # 
-    # m1a <- full_join(x = bal4, y = tx3, by = c('RC.Opp.Number', 'Account.Name', 'RC.Account.Number')) # Account.Name converted to char
-    # setdiff(bal3$RC.Opp.Number, tx2$RC.Opp.Number)  # check that everything will match
-    # setdiff(tx2$RC.Opp.Number, bal3$RC.Opp.Number)  # check that everything will match
-    # # these must be loans that never had a month end balance?
-    # 
-    # m2a <- full_join(m1a, sems, by = c('RC.Account.Number', 'Year'))
-    # apply(m2a, 2, function(x) sum(is.na(x)))
-    # apply(sems, 2, function(x) sum(is.na(x)))
-    # sum(!duplicated(m2a[,c('RC.Account.Number', 'Year')]),na.rm = TRUE)
-    # m3a <- left_join(m2a, pds, by = 'RC.Opp.Number')
-    # m4a <- left_join(m3a, client_char, by = 'RC.Account.Number')
-    # m5a <- left_join(m4a, wo, by = 'LoanID')
-    # m6a <- left_join(m5a, client_fin, by = c('RC.Account.Number', 'Year'))
-    # dim(m5a) - dim(m6a)
-    # loans <- m6a
-    # 
-    
-    
 # --------------------------------------------------------
 # NEW VARIABLES
 
@@ -270,7 +266,8 @@ dim(bal3) == dim(bal2)      # should be TRUE FALSE
  # fill in sems and client level characteristics
 loans <- loans %>%
   group_by(RC.Account.Number) %>%
-  fill(processing_type, rc_first, producers, payments_to_producers, .direction = c('down', 'up')) 
+  fill(processing_type, rc_first, producers, payments_to_producers, 
+       loan_size_cat, loan_size_cat_scott, .direction = c('down', 'up')) 
 
 
   # remove duplicate rows... 110317 had two rows for 2005 at same loan id.. (?)
@@ -291,7 +288,8 @@ rev_temp <- loans %>%
   summarise(
     revenue_          = sum(revenue_, na.rm=TRUE),
     el                = sum(el, na.rm=TRUE),
-    revenue_less_risk = sum(revenue_less_risk, na.rm=TRUE)
+    revenue_less_risk_check = sum(revenue_less_risk, na.rm=TRUE),
+    revenue_less_risk = sum(revenue_ - el, na.rm=TRUE)
     ) %>%
   select(RC.Account.Number, Year, revenue_less_risk, revenue_est = revenue_, expected_loss = el) %>%
   distinct(RC.Account.Number, Year, .keep_all = TRUE)
@@ -302,20 +300,44 @@ rev_temp <- loans %>%
 	 # remove duplicates of Year/Loan and fill in the blanks for RC.Account.Number
 	 # note that revenue etc won't work
 	   clients <- loans %>%
-	      group_by(RC.Account.Number, Year) %>%
-	      fill(sales, producers, rc_first, hectares, payments_to_producers, wages, .direction = c("down", "up")) %>%
+	      group_by(RC.Account.Number) %>%
+	      fill( rc_first, Account.Name,
+	           loan_size_cat, loan_size_cat_scott, .direction = c("down", "up")) %>%
+	     group_by(RC.Account.Number, Year) %>%
+	     fill(sales, producers, hectares, payments_to_producers, wages, 
+	          .direction = c("down", "up")) %>%	     
 	      distinct(Year, RC.Account.Number, .keep_all = TRUE) %>%
-	      mutate(balance = sum(balance, na.rm = TRUE), pd_mean = mean(pd, na.rm = TRUE)) %>%
 	      select(RC.Account.Number:active_today, Lending.Region, rc_first, producers, payments_to_producers, wages,
-	             sector = Sector.and.Perishability,
+	             sector = Sector.and.Perishability, balance_first, loan_size_cat, loan_size_cat_scott,
 	             revenue:Internal.Interest.Rate...., processing_type, sales, # sales_growth_yoy,
+	             active_year,
 	             -LoanID) %>% # careful about going from loan to client
 	      select(-RC.Opp.Number) %>%
+	      select(-balance) %>%     # this is just one per client, from bal4
+	      select(-active_year) %>%     # this is just one per client, from bal4
 	     ungroup()
 	   
 	   clients <- left_join(clients, rev_temp, by = c('RC.Account.Number', 'Year'))
 
 	   
+	   clients <- bal2 %>%
+	     group_by(RC.Account.Number, Year) %>%
+  	   summarise(
+        bal_avg  = max(bal_avg, na.rm = TRUE),
+        bal_peak = max(bal_peak, na.rm = TRUE)
+        ) %>%
+  	   mutate(active_year       = bal_peak > 0 ) %>%
+	     select(RC.Account.Number, Year, bal_avg, bal_peak, active_year) %>%
+	     right_join(clients, by = c('RC.Account.Number', 'Year'))
+	   
+	   
+	   # mutate(
+	   #   # balance = sum(balance, na.rm = TRUE), # needs to be summarise
+	   #   pd_mean = mean(pd, na.rm = TRUE), 
+	   #   active_year = balance > 0 ,
+	   #   loan_size_cat = na.locb(loan_size_cat, na.rm = T),
+	   #   loan_size_cat_scott = na.locb(loan_size_cat_scott, na.rm = T)
+	   # ) %>%
 	   
 	   # fill in some things 
 	   clients <- clients %>%

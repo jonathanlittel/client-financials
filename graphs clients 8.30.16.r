@@ -276,7 +276,13 @@ sales.animal.plot <- ggplot(
     geom_line(aes(group = growth_animal, color = growth_animal))
 sales.animal.plot
   
-
+p <- ggplot(filter(clients, Year==year_one, loan_size_cat=='50k-500k'), aes(x = Year)) +
+  # ggplot(filter(clients, Year==year_one), aes(x = Year, group = loan_size_cat)) +
+  # geom_histogram(binwidth = 1, alpha = 0.5) +
+  geom_histogram(bins = 18, alpha = .35) +
+  stat_bin(aes(y=..count.., label=..count..), binwidth = 1, geom="text", vjust=-.5, bins = 18) +
+  theme_minimal()
+p
 
 ggplot(filter(clients, year_n > -4, year_n < 14), aes(sales, group = year_n, color = year_n>0)) + geom_density()
 ggplot(filter(clients, year_n > -4, year_n < 14), aes(log(sales), group = year_n, color = year_n)) + geom_density()

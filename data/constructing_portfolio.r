@@ -111,12 +111,7 @@ attrition_rates_by_year_n50k
     colnames(sg_table) <- sg_table[1,]
     sg_table <- as.data.frame(sg_table)
     sg_table <- sg_table[-1,]
-    # create number of quantile slices
-    # (alternatively could do all quantiles and use as lookup table...)
-    q <- 1 / (length(number_of_loans) + 1)
-    probs = round(
-      seq(q, 1 - q, by = q), 
-      digits = 2)
+
     
     # temp <- matrix(data = rep(NA, 5*10), nrow = 5, ncol = 10)
     # new <- for (y in 1:length(number_of_loans)) {
@@ -129,9 +124,9 @@ attrition_rates_by_year_n50k
     
     
 #--------- revenue ---------------
-    rev_table <- cl %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+    rev_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
       group_by(year_n) %>% 
-      summarise(quantiles = list(quantile(revenue, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
+      summarise(quantiles = list(quantile(revenue_est, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
     q <- t(as.data.frame(rev_table$quantiles))
     row.names(q) <- NULL
     rev_table <- cbind(rev_table, q)
@@ -142,9 +137,9 @@ attrition_rates_by_year_n50k
     rev_table <- rev_table[-1,]
 
 #--------- risk ---------------
-    risk_table <- cl %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+    risk_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
       group_by(year_n) %>% 
-      summarise(quantiles = list(quantile(revenue, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
+      summarise(quantiles = list(quantile(expected_loss, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
     q <- t(as.data.frame(risk_table$quantiles))
     row.names(q) <- NULL
     risk_table <- cbind(risk_table, q)
@@ -153,11 +148,24 @@ attrition_rates_by_year_n50k
     colnames(risk_table) <- risk_table[1,]
     risk_table <- as.data.frame(risk_table)
     risk_table <- risk_table[-1,]
-
-#--------- producers ---------------
-    prod_table <- cl %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+    
+#---------rev less risk ---------------
+    rev_risk_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
       group_by(year_n) %>% 
-      summarise(quantiles = list(quantile(revenue, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
+      summarise(quantiles = list(quantile(revenue_less_risk, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
+    q <- t(as.data.frame(rev_risk_table$quantiles))
+    row.names(q) <- NULL
+    rev_risk_table <- cbind(rev_risk_table, q)
+    rev_risk_table$quantiles <- NULL
+    rev_risk_table <- t(rev_risk_table)
+    colnames(rev_risk_table) <- rev_risk_table[1,]
+    rev_risk_table <- as.data.frame(rev_risk_table)
+    rev_risk_table <- rev_risk_table[-1,]
+    
+#--------- producers ---------------
+    prod_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+      group_by(year_n) %>% 
+      summarise(quantiles = list(quantile(producers, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
     q <- t(as.data.frame(prod_table$quantiles))
     row.names(q) <- NULL
     prod_table <- cbind(prod_table, q)
@@ -167,21 +175,197 @@ attrition_rates_by_year_n50k
     prod_table <- as.data.frame(prod_table)
     prod_table <- prod_table[-1,] 
 
-#--------- producers ---------------
-    prod_table <- cl %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+#--------- wages ---------------
+    wages_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
       group_by(year_n) %>% 
-      summarise(quantiles = list(quantile(revenue, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
-    q <- t(as.data.frame(prod_table$quantiles))
+      summarise(quantiles = list(quantile(wages, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
+    q <- t(as.data.frame(wages_table$quantiles))
     row.names(q) <- NULL
-    prod_table <- cbind(prod_table, q)
-    prod_table$quantiles <- NULL
-    prod_table <- t(prod_table)
-    colnames(prod_table) <- prod_table[1,]
-    prod_table <- as.data.frame(prod_table)
-    prod_table <- prod_table[-1,]       
+    wages_table <- cbind(wages_table, q)
+    wages_table$quantiles <- NULL
+    wages_table <- t(wages_table)
+    colnames(wages_table) <- wages_table[1,]
+    wages_table <- as.data.frame(wages_table)
+    wages_table <- wages_table[-1,] 
     
+#--------- sales ---------------
+    sales_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+      group_by(year_n) %>% 
+      summarise(quantiles = list(quantile(sales, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
+    q <- t(as.data.frame(sales_table$quantiles))
+    row.names(q) <- NULL
+    sales_table <- cbind(sales_table, q)
+    sales_table$quantiles <- NULL
+    sales_table <- t(sales_table)
+    colnames(sales_table) <- sales_table[1,]
+    sales_table <- as.data.frame(sales_table)
+    sales_table <- sales_table[-1,]       
+
+#--------- payments ---------------
+    payments_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+      group_by(year_n) %>% 
+      summarise(quantiles = list(quantile(payments_to_producers, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
+    q <- t(as.data.frame(payments_table$quantiles))
+    row.names(q) <- NULL
+    payments_table <- cbind(payments_table, q)
+    payments_table$quantiles <- NULL
+    payments_table <- t(payments_table)
+    colnames(payments_table) <- payments_table[1,]
+    payments_table <- as.data.frame(payments_table)
+    payments_table <- payments_table[-1,]       
     
+#--------- payments grow ---------------
+    pg_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+      group_by(year_n) %>% 
+      summarise(quantiles = list(quantile(payments_growth, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
+    q <- t(as.data.frame(pg_table$quantiles))
+    row.names(q) <- NULL
+    pg_table <- cbind(pg_table, q)
+    pg_table$quantiles <- NULL
+    pg_table <- t(pg_table)
+    colnames(pg_table) <- pg_table[1,]
+    pg_table <- as.data.frame(pg_table)
+    pg_table <- pg_table[-1,]       
     
-    rev_table[probs*100,]
-    sg_table[probs*100,]
+#--------- balance ---------------
+    balance_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+      group_by(year_n) %>% 
+      summarise(quantiles = list(quantile(bal_avg, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
+    q <- t(as.data.frame(balance_table$quantiles))
+    row.names(q) <- NULL
+    balance_table <- cbind(balance_table, q)
+    balance_table$quantiles <- NULL
+    balance_table <- t(balance_table)
+    colnames(balance_table) <- balance_table[1,]
+    balance_table <- as.data.frame(balance_table)
+    balance_table <- balance_table[-1,]       
+    
+#--------- sales increase ---------------
+    clients$sales_increase <- clients$sales - clients$sales_in_year_zero
+    sales_increase_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+      group_by(year_n) %>% 
+      summarise(quantiles = list(quantile(sales_increase, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
+    q <- t(as.data.frame(sales_increase_table$quantiles))
+    row.names(q) <- NULL
+    sales_increase_table <- cbind(sales_increase_table, q)
+    sales_increase_table$quantiles <- NULL
+    sales_increase_table <- t(sales_increase_table)
+    colnames(sales_increase_table) <- sales_increase_table[1,]
+    sales_increase_table <- as.data.frame(sales_increase_table)
+    sales_increase_table <- sales_increase_table[-1,]       
+    
+
+    number_of_loans <- find_n_loans(30)
+    
+#----------------------year 1
+    q <- 1 / ((number_of_loans[1]) + 1)
+    l_qu1 = round(
+      seq(q, 1 - q, by = q), 
+      digits = 2)
+    
+    rev_table[l_qu1*100,]
+    sg_table[l_qu1*100,]
+    sales_table[l_qu1*100,]
+    balance_table[l_qu1*100,]
+    prod_table[l_qu1*100,]
+    wages_table[l_qu1*100,]
+    risk_table[l_qu1*100,]
+    rev_risk_table[l_qu1*100,]
+    payments_table[l_qu1*100,]
+    pg_table[l_qu1*100,]
+
+    apply(prod_table[l_qu1*100,], 2, sum)
+    apply(wages_table[l_qu1*100,], 2, sum)
+    apply(sales_table[l_qu1*100,], 2, sum)
+    apply(payments_table[l_qu1*100,], 2, sum)
+    
+#----------------------year 5
+    find_n_loans(30)
+    q <- 1 / ((number_of_loans[5]) + 1)
+    l_qu = round(
+      seq(q, 1 - q, by = q), 
+      digits = 2)
+    
+    rev_table[l_qu*100,]
+    sg_table[l_qu*100,]
+    sales_table[l_qu*100,]
+    balance_table[l_qu*100,]
+    prod_table[l_qu*100,]
+    wages_table[l_qu*100,]
+    risk_table[l_qu*100,]
+    rev_risk_table[l_qu*100,]
+    payments_table[l_qu*100,]
+    pg_table[l_qu*100,]
+    
+    apply(prod_table[l_qu*100,], 2, sum)
+    apply(wages_table[l_qu*100,], 2, sum)
+    apply(sales_table[l_qu*100,], 2, sum)
+    apply(payments_table[l_qu*100,], 2, sum)
+    apply(rev_risk_table[l_qu*100,], 2, sum)
+    apply(rev_table[l_qu*100,], 2, sum)
+    
+   
+    populate_row <- function(year) {
+      loans <-  number_of_loans[year]
+      q <- 1 / ((number_of_loans[year]) + 1)
+      l_qu <- round(seq(q, 1-q, by = q), digits = 2)
+      outcomes[year, 1] <- loans
+      outcomes[year, 2] <- apply(sales_table[l_qu*100,], 2, sum)[year]
+      outcomes[year, 3] <- apply(prod_table[l_qu*100,], 2, sum)[year]
+      outcomes[year, 4] <- apply(payments_table[l_qu*100,], 2, sum)[year]
+      outcomes[year, 5] <- apply(wages_table[l_qu*100,], 2, sum)[year]
+      outcomes[year, 6] <- apply(rev_table[l_qu*100,], 2, sum)[year]
+      outcomes[year, 7] <- apply(risk_table[l_qu*100,], 2, sum)[year]
+      outcomes[year, 8] <- apply(rev_risk_table[l_qu*100,], 2, sum)[year]
+      outcomes[year, 9] <- apply(sales_increase_table[l_qu*100,], 2, sum)[year]
+      outcomes[year, 10] <- apply(balance_table[l_qu*100,], 2, sum)[year]
+      outcomes
+    }
+    
+    outcomes <- data.frame(
+      clients = rep(NA, 5),
+      sales = rep(NA, 5),
+      producer_years = rep(NA, 5),
+      payments = rep(NA, 5),
+      wages = rep(NA, 5),
+      revenue_rc = rep(NA, 5),
+      risk_rc = rep(NA, 5),
+      rev_net_risk = rep(NA, 5),
+      sales_increase = rep(NA, 5),
+      balance = rep(NA, 5)
+    )
+    outcomes <- populate_row(year = 1)
+    outcomes <- populate_row(year = 2)
+    outcomes <- populate_row(year = 3)
+    outcomes <- populate_row(year = 4)
+    outcomes <- populate_row(year = 5)
+    t(outcomes)    
+    
+    outcomes$sales / outcomes$clients
+    outcomes <- outcomes %>%
+      mutate(
+        sales_cumulative = cumsum(sales),
+        producer_years_cumulative = cumsum(producer_years),
+        payments_cumulative = cumsum(payments),
+        wages_cumulative = cumsum(wages)
+      )
+    
+    rownames(outcomes1) <- paste0('Y', 1:5)
+    
+    outcomes <- outcomes %>%
+      mutate(
+        opex = 30000 * clients,
+        opex_cumulative = cumsum(opex),
+        sales_per_opex_dollar = sales / opex,
+        opex_dollar_per_producer_year = opex / producer_years ,
+        sales_per_opex_dollar_cumulative = sales_cumulative / opex_cumulative,
+        sales_increase_per_opex_dollar_cumulative = sales_increase / opex_cumulative
+      )
+    
+    # outcomes <- round(outcomes, 2)
+    t(outcomes)
+    
+    setwd("C:/Box Sync/jlittel/comms/client financials/data")
+    save.image(file = 'clientfin4.RData')
+    
     
