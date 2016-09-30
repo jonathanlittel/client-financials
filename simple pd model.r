@@ -1,6 +1,4 @@
 #--------------- PD MODEL ----------------------
-
-names(lc)
 df.pd <- select(lc, RC.Opp.Number, Loan.Tenor, Loan.Type )
 
 loans_sub <- select(loans, sales, RC.Opp.Number, WriteoffsDummy, pd) %>% 
@@ -45,7 +43,7 @@ replace_na <- function(x, replacement = 0) {
 }
 
 # predict revenue (to replace revenue for writeoff loans)
-lc_cut <- select(lc, RC.Opp.Number, Loan.Tenor, Internal.Interest.Rate...., LoanID)
+lc_cut <- select(lc, RC.Opp.Number, Loan.Tenor, Internal.Interest.Rate...., LoanID, Currency)
 n2 <- select(tx3, RC.Opp.Number, revenue) %>% left_join(lc_cut, by = 'RC.Opp.Number')
 n3 <- left_join(n2, wo, by = 'LoanID')
 df.rev <- select(bal4, RC.Opp.Number, bal_avg_loan) %>%
@@ -54,8 +52,8 @@ df.rev <- select(bal4, RC.Opp.Number, bal_avg_loan) %>%
 df.rev$WriteoffsDummy <- replace_na(df.rev$WriteoffsDummy, 0)
 glimpse(df.rev)
 
-rev.lm <- lm(revenue ~ bal_avg_loan + Loan.Tenor + Internal.Interest.Rate...., data = filter(df.rev, WriteoffsDummy == 0))
-
+rev.lm <- lm(revenue ~ bal_avg_loan + Loan.Tenor + Internal.Interest.Rate.... , data = filter(df.rev, WriteoffsDummy == 0))
+   # + factor(Currency=='USD')
 revenue_predicted <- predict(rev.lm, df.rev, type = 'response')
 loans <- loans %>% group_by(RC.Opp.Number) %>% mutate(sales_lag = lag(sales,1, order_by = Year))
 loans$sales_lag_log <- log(loans$sales_lag + 1)
@@ -66,7 +64,8 @@ loans$interest_rate_pred <- ifelse(loans$Internal.Interest.Rate..../ 100 < 0.07,
 
 
 # predicted revenue is peak balance, times 75% usage, for the loan tenor, times the interest rate (which is adjusted if <7%)
-loans <- mutate(loans,revenue_predicted = bal_avg_loan * 0.75 * Loan.Tenor/12 * interest_rate_pred )
+usage_rate <- 0.75
+loans <- mutate(loans, revenue_predicted = bal_avg_loan * usage_rate * Loan.Tenor/12 * interest_rate_pred )
 plot(loans$revenue - loans$revenue_predicted)
 loans$revenue_ <- ifelse(loans$WriteoffsDummy == 1 | loans$revenue < 0, loans$revenue_predicted, loans$revenue)
 
@@ -78,10 +77,15 @@ loans <- loans %>%
     ead = ifelse(Loan.Type == 'Line of Credit', 0.64, 0.54),
     lgd = ifelse(Loan.Type == 'Capital Expenditure', 0.69, 0.90),
     el  = bal_avg_loan * pd2 * ead * lgd,
-    revenue_less_risk = revenue_ - el
-  )
+    revenue_less_risk = revenue_ - el,
+    interest_cost = Loan.Tenor/12 * 0.02 * bal_avg_loan,
+    revenue_less_risk_less_debt = revenue_less_risk - interest_cost,
+    revenue_less_risk_per_year = revenue_less_risk / ceiling(Loan.Tenor/12),   # divide by years in tenor, rounded up
+    revenue_less_risk_less_debt = revenue_less_risk_less_debt,
+    revenue_less_risk_less_debt_per_year = revenue_less_risk_less_debt / ceiling(Loan.Tenor/12)
+    )
 
-# quantile(loans_c$revenue_less_risk, probs = seq(0, 1, by = 0.01), na.rm = TRUE)
+
 # robbie: use what have for collateral, then LoC are unsecured, capex are secured
 # term EAD is 64% of max exposure, loc is 54%
 

@@ -87,6 +87,9 @@ clients_all_years <- df.plot %>%
          active_year = replace(active_year, is.na(active_year), FALSE),
          growth_cat_year = replace(growth_cat_year, active_year == TRUE & is.na(sales), 'Active - No Data'),
          growth_cat_year = replace(growth_cat_year, active_before > 0 & active_year == FALSE, 'Not renewed'),
+         vintage = year_one,
+         vintage = replace(vintage, active_year == TRUE & is.na(sales), 'Active - No Data'),
+         vintage = factor(vintage),
          vintage_cat = paste(year_one, growth_cat_year, sep = "_"),
          vintage_cat = replace(vintage_cat, active_year == TRUE & is.na(sales), 'Active - No Data'),
          vintage_cat = replace(vintage_cat, active_before > 0 & active_year == FALSE, 'Not renewed'),
@@ -155,23 +158,25 @@ stream.simple
 
 clients_sum_all <- clients_all_years %>%
   filter(active_before > 0, loan_size_cat == '50k-500k')  %>% # , active_year == TRUE
-  group_by( Year, vintage_cat ) %>%    # , year_zero year_one,
+  group_by( Year, vintage ) %>%    # , year_zero year_one,
   summarise(
     n = n(),
     nsales = sum(sales > 0, na.rm = TRUE),
-    sales_sum = sum(sales, na.rm = TRUE),
-    sales_nom_increase = sum(sales - lag(sales, 1), na.rm = TRUE),
-    sales_nom_increase_since_start = sum(sales_nom_increase_since_start_cl, na.rm = TRUE)
+    sales_sum = sum(sales, na.rm = TRUE)/1e6,
+    sales_nom_increase = sum(sales - lag(sales, 1), na.rm = TRUE)/1e6,
+    sales_nom_increase_since_start = sum(sales_nom_increase_since_start_cl, na.rm = TRUE)/1e6,
+    sales_increase_since_start_per_client = sales_nom_increase_since_start / n 
     # sum(sales_nom_increase_since_start_cl, na.rm = TRUE) -
     # sum(lag(sales_nom_increase_since_start_cl, 4), na.rm = TRUE),
-  )
+  ) 
 
-# dim(clients_sum_all)
+  clients_sum_all[,3:8] <- round(clients_sum_all[,3:8], digits = 1)
+
 clients %>% group_by(Year, is.na(sales)) %>% filter(active_year==TRUE) %>% summarise(n())
 
 stream.vintage2 <- clients_sum_all %>%
   filter(Year < 2015) %>%
-  streamgraph("vintage_cat", "n", "Year", interpolate="cardinal") %>%
+  streamgraph("vintage", "sales_sum", "Year", interpolate="cardinal") %>%
   sg_axis_x(1, "year", "%Y") %>%
   sg_fill_brewer("PuOr") %>%  # "Spectral" # 
   # sg_fill_tableau("purplegray12") %>%
@@ -179,13 +184,30 @@ stream.vintage2 <- clients_sum_all %>%
   # sg_title('Client growth by year of vintage')
 stream.vintage2
 
-stream.vintage.2011 <- clients_sum_all %>%
-  filter(vintage_cat ==)
-  streamgraph("vintage_cat", "n", "Year", interpolate="cardinal") %>%
+
+
+stream.vintage.increase <- clients_sum_all %>%
+  filter(Year < 2015) %>%
+  streamgraph("vintage", "sales_nom_increase_since_start", "Year", interpolate="cardinal", offset="zero") %>%
   sg_axis_x(1, "year", "%Y") %>%
-  sg_fill_brewer("PuOr") %>%
-  sg_legend(show=TRUE, label="Business Success")
-stream.vintage.2011
+  # sg_axis_y("Sales Increase ($M)") %>%
+  sg_fill_brewer("PuOr") %>%  # "Spectral" # 
+  # sg_fill_tableau("purplegray12") %>%
+  sg_legend(show=TRUE, label="Vintage Year")
+  # sg_title('Client growth by year of vintage')
+stream.vintage.increase
+
+stream.vintage.increase.avg <- clients_sum_all %>%
+  filter(Year < 2015) %>%
+  streamgraph("vintage", "sales_increase_since_start_per_client", "Year", interpolate="cardinal", offset="zero") %>%
+  sg_axis_x(1, "year", "%Y") %>%
+  # sg_axis_y("Sales Increase ($M)") %>%
+  sg_fill_brewer("PuOr") %>%  # "Spectral" # 
+  # sg_fill_tableau("purplegray12") %>%
+  sg_legend(show=TRUE, label="Vintage Year")
+  # sg_title('Client growth by year of vintage')
+stream.vintage.increase.avg
+
 
 
 # completeness <- clients %>%

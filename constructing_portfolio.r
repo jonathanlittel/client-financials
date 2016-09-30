@@ -1,4 +1,70 @@
 
+
+ # figure out if client dropped out or *could* be active in a year
+ attrition_rates_by_year_n50k <- clients %>%
+   group_by(RC.Account.Number) %>%
+   filter(year_n > 0, loan_size_cat == '50k-500k', Year < 2016) %>%
+   # filter(year_n > 0, between(sales, 0, 1e6), Year < 2016) %>%    # by sales category
+   arrange(year_n) %>%
+   mutate(active_next_year = lead(active_year, 1),
+          active_next_year = replace(active_next_year, is.na(active_next_year), FALSE)) %>%
+   group_by(year_n) %>%
+   filter(active_year==TRUE, Year < 2015) %>%
+   summarise(
+     attrition_rate = 1 - (sum(active_next_year, na.rm = TRUE) / sum(active_year, na.rm = TRUE)),
+     n = n())
+  attrition_rates_by_year_n50k
+
+ # figure out if loan dropped out or *could* be active in a year
+ attrition_rates_by_loan_by_year_n50k <- loans %>%
+   group_by(RC.Account.Number) %>%
+   filter(loan_number > 0, loan_size_cat == '50k-500k', Year < 2016) %>%
+   # filter(loan_number > 0, between(sales, 0, 1e6), Year < 2016) %>%   # by sales category
+   distinct(loan_number, RC.Account.Number, .keep_all = TRUE ) %>%
+   arrange(loan_number) %>%
+   mutate(subsequent_loan = lead(loan_number, 1) > 0,
+          subsequent_loan = replace(subsequent_loan, is.na(subsequent_loan), FALSE)) %>%
+   group_by(loan_number) %>%
+   filter(active_year==TRUE, Year < 2015) %>%
+   summarise(
+     attrition_rate_loan = 1 - (sum(subsequent_loan, na.rm = TRUE) / sum(loan_number>0, na.rm = TRUE)),
+     n = n(),
+     pd_median = median(pd, na.rm = TRUE),
+     wo_mean = mean(WriteoffsDummy, na.rm = TRUE)
+     )
+   # figure out if loan dropped out or *could* be active in a year
+ attrition_rates_by_loan_by_year_n_sales <- loans %>%
+   group_by(RC.Account.Number) %>%
+   # filter(loan_number > 0, loan_size_cat == '50k-500k', Year < 2016) %>%
+   filter(loan_number > 0, between(sales_year, 0, 1e6), Year < 2016) %>%   # by sales category
+   distinct(loan_number, RC.Account.Number, .keep_all = TRUE ) %>%
+   arrange(loan_number) %>%
+   mutate(subsequent_loan = lead(loan_number, 1) > 0,
+          subsequent_loan = replace(subsequent_loan, is.na(subsequent_loan), FALSE)) %>%
+   group_by(loan_number) %>%
+   filter(active_year==TRUE, Year < 2015) %>%
+   summarise(
+     attrition_rate_loan = 1 - (sum(subsequent_loan, na.rm = TRUE) / sum(loan_number>0, na.rm = TRUE)),
+     n = n(),
+     pd_median = median(pd, na.rm = TRUE),
+     wo_mean = mean(WriteoffsDummy, na.rm = TRUE)
+     )
+
+
+ attrition_rates_by_year_n_sales <- clients %>%
+   group_by(RC.Account.Number) %>%
+   filter(year_n > 0, between(sales_in_year_zero, 0, 1e6), Year < 2016) %>%
+   # filter(year_n > 0, between(sales, 0, 1e6), Year < 2016) %>%    # by sales category
+   arrange(year_n) %>%
+   mutate(active_next_year = lead(active_year, 1),
+          active_next_year = replace(active_next_year, is.na(active_next_year), FALSE)) %>%
+   group_by(year_n) %>%
+   filter(active_year==TRUE, Year < 2015) %>%
+   summarise(
+     attrition_rate = 1 - (sum(active_next_year, na.rm = TRUE) / sum(active_year, na.rm = TRUE)),
+     n = n())
+  attrition_rates_by_year_n_sales
+ 
 # construction a portfolio
 
  clients5_bal_sum <- clients5 %>%
@@ -62,7 +128,7 @@ payments.plot <- ggplot(filter(summary_port, !is.na(growth_animal)),
 
 #------------ functions to build portfolio 
 
-attrition_rates_by_year_n50k
+
   #------------ return the number of loans after five years, based on attrition rates, on 50k-500k loans
   find_n_loans <- function (n_loans, attrition_table = attrition_rates_by_year_n50k[,2]) {
     # this should be recursive ideally...
@@ -99,8 +165,9 @@ attrition_rates_by_year_n50k
     # }
     # return_outcome("sales_growth", n_loans)
     # 
-    # create distribution dataframe by year_n
-    sg_table <- cl %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
+
+#--------- sales growth  ---------------
+    sg_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
       group_by(year_n) %>% 
       summarise(quantiles = list(quantile(sales_growth, na.rm = TRUE, probs = seq(0.01, 1, by = 0.01))))
     q <- t(as.data.frame(sg_table$quantiles))
@@ -112,17 +179,6 @@ attrition_rates_by_year_n50k
     sg_table <- as.data.frame(sg_table)
     sg_table <- sg_table[-1,]
 
-    
-    # temp <- matrix(data = rep(NA, 5*10), nrow = 5, ncol = 10)
-    # new <- for (y in 1:length(number_of_loans)) {
-    #   print(y)
-    #   q <- 1 / (number_of_loans[y] + 1 )
-    #   print(q)
-    #   probs = round(seq(q, 1 - q, by = q), digits = 2) * 100
-    #   temp[y,] <- sg_table[probs, y]
-    # }
-    
-    
 #--------- revenue ---------------
     rev_table <- clients %>% filter(active_year == TRUE, loan_size_cat == '50k-500k') %>%
       group_by(year_n) %>% 
@@ -350,11 +406,11 @@ attrition_rates_by_year_n50k
         wages_cumulative = cumsum(wages)
       )
     
-    rownames(outcomes1) <- paste0('Y', 1:5)
+    rownames(outcomes) <- paste0('Y', 1:5)
     
     outcomes <- outcomes %>%
       mutate(
-        opex = 30000 * clients,
+        opex = 25000 * clients,
         opex_cumulative = cumsum(opex),
         sales_per_opex_dollar = sales / opex,
         opex_dollar_per_producer_year = opex / producer_years ,
@@ -366,7 +422,47 @@ attrition_rates_by_year_n50k
     t(outcomes)
     outcomes[-10] - outcomes_old
     
-    setwd("C:/Box Sync/jlittel/comms/client financials/data")
-    save.image(file = 'clientfin4.RData')
-    
-    
+
+
+
+
+# balance by date, colored by sales size
+  temp <- select(clients, sales, Year, RC.Account.Number)
+  bal_gr <- left_join(bal2, temp, by = c('RC.Account.Number', 'Year'))
+
+  bal_gr %>%
+    arrange(sales) %>%
+    filter(balance > 0) %>%
+    ggplot(aes(x = date, y = balance, fill = sales/1e6)) + geom_bar(stat = 'identity')
+
+# better colors 
+balance_by_sales_all_graph <- bal_gr %>%
+    fill(sales, .direction = 'down') %>%
+    arrange(sales) %>%
+    filter(balance > 0) %>%
+    ggplot(aes(x = date, y = balance, fill = sales/1e6)) + geom_bar(stat = 'identity') +
+    scale_y_continuous(labels = scales::dollar) +
+    scale_fill_distiller(type = "seq", palette = 'Spectral', direction = -1, values = NULL, space = "Lab", na.value = "grey50", guide = "colourbar")
+
+# better colors 
+balance_by_sales_5M_graph <- bal_gr %>%
+    fill(sales, .direction = 'down') %>%
+    arrange(sales) %>%
+    filter(balance > 0, sales < 5000000) %>%
+    ggplot(aes(x = date, y = balance, fill = sales/1e6)) + geom_bar(stat = 'identity') +
+    scale_y_continuous(labels = scales::dollar) +
+    scale_fill_distiller(type = "seq", palette = 'Spectral', direction = -1, values = NULL, space = "Lab", na.value = "grey50", guide = "colourbar")
+balance_by_sales_all_graph
+balance_by_sales_5M_graph
+
+
+temp <- filter(clients, !duplicated(RC.Account.Number))
+temp %>% group_by(year_zero) %>% summarise( r = sum(has_sales_zero, na.rm = T) / n(), n())
+
+
+
+
+      setwd("C:/Box Sync/jlittel/comms/client financials/data")
+      save.image(file = 'clientfin4.RData')
+      
+      
