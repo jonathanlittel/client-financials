@@ -442,7 +442,7 @@ balance_by_sales_all_graph <- bal_gr %>%
     filter(balance > 0) %>%
     ggplot(aes(x = date, y = balance, fill = sales/1e6)) + geom_bar(stat = 'identity') +
     scale_y_continuous(labels = scales::dollar) +
-    scale_fill_distiller(type = "seq", palette = 'Spectral', direction = -1, values = NULL, space = "Lab", na.value = "grey50", guide = "colourbar")
+    scale_fill_distiller('Sales ($M)',type = "seq", palette = 'Spectral', direction = -1, values = NULL, space = "Lab", na.value = "grey50", guide = "colourbar")
 
 # better colors 
 balance_by_sales_5M_graph <- bal_gr %>%
@@ -451,7 +451,7 @@ balance_by_sales_5M_graph <- bal_gr %>%
     filter(balance > 0, sales < 5000000) %>%
     ggplot(aes(x = date, y = balance, fill = sales/1e6)) + geom_bar(stat = 'identity') +
     scale_y_continuous(labels = scales::dollar) +
-    scale_fill_distiller(type = "seq", palette = 'Spectral', direction = -1, values = NULL, space = "Lab", na.value = "grey50", guide = "colourbar")
+    scale_fill_distiller('Sales ($M)', type = "seq", palette = 'Spectral', direction = -1, values = NULL, space = "Lab", na.value = "grey50", guide = "colourbar")
 balance_by_sales_all_graph
 balance_by_sales_5M_graph
 
@@ -459,10 +459,64 @@ balance_by_sales_5M_graph
 temp <- filter(clients, !duplicated(RC.Account.Number))
 temp %>% group_by(year_zero) %>% summarise( r = sum(has_sales_zero, na.rm = T) / n(), n())
 
+# balance by loan Amount
+  temp <- select(lc, Amount, RC.Opp.Number) 
+  bal_Amount <- left_join(bal, temp, by = 'RC.Opp.Number')
+
+ balance_by_Amount <- bal_Amount %>% 
+    arrange(Amount) %>%
+    filter(balance > 0, Year > 2008) %>%
+    # mutate(loan_size_cat = )
+    ggplot(aes( x = date, y = balance, fill = Amount )) + geom_bar(stat = 'identity') +
+    scale_y_continuous(labels = scales::dollar) +
+    scale_fill_distiller(type = "seq", palette = 'Spectral', 
+      direction = -1, values = NULL, space = "Lab", na.value = "grey50", guide = "colourbar", labels = scales::comma)
+balance_by_Amount
+
+# summary stats of recent portfolio by sales_cat and by Amount
+ bal_amount_sum <-  bal_Amount %>%
+    mutate(
+      amount_cat = cut(Amount, c(-Inf, 5e4, 5e5, Inf), labels = c('0-50k', '50k-500k', '500k+'))
+      ) %>%
+      group_by(date, amount_cat) %>%
+      summarise(
+        balance = sum(balance, na.rm = TRUE))
+bal_amount_bar <- bal_amount_sum %>%
+      filter(date > '2014-06-1') %>%
+      ggplot(aes(x = date, y = balance, fill = amount_cat)) + geom_bar(stat = 'identity') + 
+        scale_y_continuous('Outstanding Balance', labels = scales::dollar)  +
+        scale_fill_brewer('Approved Amount Bin', palette = 'Spectral')    
+bal_amount_bar
+
+ bal_sales_sum <-  bal_gr %>%
+    mutate(
+      sales_cat = cut(sales, 
+ c(-Inf,2.5e5, 5e5, 1e6, 1.5e6, 2e6, 3e6, 4e6, 5e6, 1e7,2e7,5e7,Inf),
+ labels = c('<= 250k', '250k-500k', '500k-1M', '1M-1.5M', '1.5M-2M', '2M-3M',
+ '3M-4M', '4M-5M', '5M-10M', '10M-20M', '20M-50M', '50M+'))
+      ) %>%
+      group_by(RC.Account.Number) %>%
+      arrange(Year) %>%
+      fill(sales_cat, .direction = 'down') %>%
+      group_by(date, sales_cat) %>%
+      summarise(
+        balance = sum(balance, na.rm = TRUE),
+        n = n())
+
+bal_sales_bar <- bal_sales_sum %>%
+      filter(date > '2014-06-1') %>%
+      ggplot(aes(x = date, y = balance, fill = sales_cat)) + geom_bar(stat = 'identity') + scale_y_continuous(labels = scales::dollar) +
+        scale_fill_brewer('Sales Bin', palette = 'Spectral')   # , guide = FALSE
+bal_sales_bar
+
+client_sales_bar <- bal_sales_sum %>%
+      filter(date > '2014-06-1') %>%
+      ggplot(aes(x = date, y = n, fill = sales_cat)) + geom_bar(stat = 'identity') + scale_y_continuous('Number of Clients') +
+        scale_fill_brewer('Sales Bin', palette = 'Spectral')  
+client_sales_bar
 
 
 
       setwd("C:/Box Sync/jlittel/comms/client financials/data")
       save.image(file = 'clientfin4.RData')
-      
       

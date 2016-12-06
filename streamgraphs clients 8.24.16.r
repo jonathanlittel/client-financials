@@ -1,3 +1,4 @@
+library(streamgraph)
 clients_c <- distinct(clients, RC.Account.Number, Year, .keep_all = TRUE)
 clients_c_growth <- clients_c %>% 
   mutate(high_growth = sales_growth_yoy > 0.15) %>%

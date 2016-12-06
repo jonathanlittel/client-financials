@@ -61,7 +61,7 @@ loan_stats <- lc_plus %>%
 		impact_score_mean = mean(impact_score, na.rm = TRUE)
 		)
 
-loan_stats[,2:4] <- round(loan_stats[,2:4], 2)
+loan_stats[,c(2:4,7:8)] <- round(loan_stats[,c(2:4,7:8)], 2)
 # loan_stats[,2:4] <- paste(loan_stats[,2:4], '%', sep ='')
 DT::datatable(loan_stats, caption = 'Completed Loans - risk by sales bins')	
 
@@ -78,7 +78,7 @@ loan_stats_2013_earlier <- lc_plus %>%
 		additionality_mean = mean(additionality, na.rm = TRUE),
 		impact_score_mean = mean(impact_score, na.rm = TRUE)
 		)
-loan_stats_2013_earlier[,2:4] <- round(loan_stats_2013_earlier[,2:4], 2)
+loan_stats_2013_earlier[,c(2:4,7:8)] <- round(loan_stats_2013_earlier[,c(2:4,7:8)], 2)
 
 
 # add pd and sales in year zero to bal_today
@@ -110,4 +110,4 @@ client_today_stats <- bal_today_plus %>%
 		n_has_pd = sum(!is.na(pd))
 		)	
 
-client_today_stats[,2:4] <- round(client_today_stats[,2:4], 2)
+client_today_stats[,c(2:4)] <- round(client_today_stats[,c(2:4)], 2)

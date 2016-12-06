@@ -28,7 +28,6 @@ df.pd$sales_lag_log <- log(df.pd$sales_lag + 1)
 df.pd$WriteoffsDummy <- replace_na(df.pd$WriteoffsDummy, 0)
 df.pd$Loan.Tenor <- replace_na(df.pd$Loan.Tenor, median(df.pd$Loan.Tenor, na.rm = TRUE))
 
-
 # df.pd$sales_log <- replace_na(df.pd$sales_log, median(df.pd$sales_log, na.rm = TRUE))
 # df.pd$sales_lag_log <- replace_na(df.pd$sales_lag_log, median(df.pd$sales_lag_log, na.rm = TRUE))
 df.model <- select(df.pd, WriteoffsDummy, sales_lag_log, Loan.Tenor)
@@ -61,8 +60,6 @@ loans$pd2 <- predict(glm.simple.pd, loans, type='response')
 loans$pd2 <- ifelse(is.na(loans$pd), loans$pd2, loans$pd)
 loans$interest_rate_pred <- ifelse(loans$Internal.Interest.Rate..../ 100 < 0.07, 0.07, loans$Internal.Interest.Rate.... / 100)
 
-
-
 # predicted revenue is peak balance, times 75% usage, for the loan tenor, times the interest rate (which is adjusted if <7%)
 usage_rate <- 0.75
 loans <- mutate(loans, revenue_predicted = bal_avg_loan * usage_rate * Loan.Tenor/12 * interest_rate_pred )
@@ -72,6 +69,7 @@ loans$revenue_ <- ifelse(loans$WriteoffsDummy == 1 | loans$revenue < 0, loans$re
 loans$yield_ <- ifelse(loans$WriteoffsDummy == 1, loans$revenue_ / loans$disb, loans$yield)
 plot(loans$yield, loans$yield_)
 
+
 loans <- loans %>%
   mutate(
     ead = ifelse(Loan.Type == 'Line of Credit', 0.64, 0.54),
@@ -80,9 +78,10 @@ loans <- loans %>%
     revenue_less_risk = revenue_ - el,
     interest_cost = Loan.Tenor/12 * 0.02 * bal_avg_loan,
     revenue_less_risk_less_debt = revenue_less_risk - interest_cost,
-    revenue_less_risk_per_year = revenue_less_risk / ceiling(Loan.Tenor/12),   # divide by years in tenor, rounded up
+    revenue_less_risk_per_year = revenue_less_risk / ceiling(Loan.Tenor/12),   # divide by years in tenor, rounded up  - note that this doesn't do loans of <1 year that 'split' year boundaries, 
+    # ie double counted 
     revenue_less_risk_less_debt = revenue_less_risk_less_debt,
-    revenue_less_risk_less_debt_per_year = revenue_less_risk_less_debt / ceiling(Loan.Tenor/12)
+    revenue_less_risk_less_debt_per_year = revenue_less_risk_less_debt * months_outstanding_per_year / months_outstanding
     )
 
 
