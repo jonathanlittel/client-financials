@@ -2,14 +2,16 @@ library(RForcecom)
 
 ## OK - let's log in - from the package documentation 
 username <- "jlittel@rootcapital.org" # normal email/sflogin
-password <- "Y]i}aT4%ku8LH[tQ.Wy73avedUBRZTkkXstiBPMMoOeT" # this is a combination of your password and app token
+password <- "=nqxEVnkr4qBpP3>ZRpfUpL7YWs5g0B2unQOQfOu3Hmp" # this is a combination of your password and app token
+# password <- "Y]i}aT4%ku8LH[tQ.Wy73avedUBRZTkkXstiBPMMoOeT" # this is a combination of your password and app token
 instanceURL <- "https://rootcapital.my.salesforce.com/"
 # instanceURL <- "https://na3.salesforce.com/"
 apiVersion <- "36.0"  ## may change as api version changes
 session <- rforcecom.login(username, password, instanceURL, apiVersion)
 
-
 # run transaction report
+# note that transaction amounts with record type of disbursement are before taking in to account fees
+# there is a separate field for the fee amount, and the outgoing cash amount
 soqlQuery1 <- paste("SELECT Opportunity__r.RC_Opp_Number__c, Opportunity__r.Account.Country__c, 
   RecordType.Name, Date__c, Internal_Transaction_Amount__c FROM Transaction__c ",
   "WHERE Opportunity__r.Portfolio__c!='LAFCo' AND (RecordTypeId = '01270000000E136AAC' OR ",
@@ -45,7 +47,7 @@ ds <- txns %>%
   group_by(Opportunity.RC_Opp_Number__c) %>%
   filter(RecordType.Name == 'Disbursement') %>%   # note that there are six transaction types, adjustments
   summarise(
-    disb    = sum(Internal_Transaction_Amount__c , na.rm = TRUE),  # for some reason this produces a matrix...
+    disb    = sum(Internal_Transaction_Amount__c , na.rm = TRUE),  # for some reason this produces a matrix. probably a two field object (currency type and #)
     disb_n  = n(),
     year_origination = year(min(Date))
   )
@@ -81,4 +83,4 @@ class(tx$disb)
 
 tx2 <- tx %>% mutate(revenue = pmt - disb, yield = pmt / disb)
 
-write.csv(tx2, 'tx2.csv')
+write.csv(tx2, 'tx2.csv', row.names = F)
