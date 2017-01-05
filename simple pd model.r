@@ -19,7 +19,7 @@ replace_na <- function(x, replacement = 0) {
   # add currency to loans df; for interest rate adjustment in rev estimate
 
   loans <- lc %>%
-    select(RC.Opp.Number, Currency) %>%
+    select(RC.Opp.Number, Currency, Internal.Interest.Rate...., Loan.Tenor, Loan.Type, Loan.Use) %>%
     right_join(loans)
 
 # create lagged sales feature  
@@ -43,8 +43,10 @@ sum(is.na(df.pd$sales_lag))
 
 # recode interest rates below 7% to 7%, and non-USD rates to 10%
   loans$interest_rate_pred <- ifelse(loans$Internal.Interest.Rate..../ 100 < 0.07, 0.07, loans$Internal.Interest.Rate.... / 100)
+  # replace loans with 0% rate to 10%
+  loans$interest_rate_pred <- ifelse(loans$Internal.Interest.Rate..../ 100 == 0, 0.10, loans$interest_rate_pred)
   fx_interest_rate_usd_equiv <- 0.10
-  loans$interest_rate_pred <- ifelse(loans$Currency=='USD', loans$interest_rate_pred, fx_interest_rate_usd_equiv)
+  loans$interest_rate_pred <- ifelse(loans$Currency %in% c('USD','EUR', 'GBP'), loans$interest_rate_pred, fx_interest_rate_usd_equiv)
   table(loans$Internal.Interest.Rate...., loans$interest_rate_pred)
 
 
@@ -65,13 +67,15 @@ sum(is.na(df.pd$sales_lag))
   df.rev$WriteoffsDummy <- replace_na(df.rev$WriteoffsDummy, 0)
   # recode interest rates below 7% to 7%, and non-USD rates to 10%
   df.rev$interest_rate_pred <- ifelse(df.rev$Internal.Interest.Rate..../ 100 < 0.07, 0.07, df.rev$Internal.Interest.Rate.... / 100)
+  df.rev$interest_rate_pred <- ifelse(df.rev$Internal.Interest.Rate..../ 100   == 0, 0.10, df.rev$interest_rate_pred / 100)
   fx_interest_rate_usd_equiv <- 0.10
-  df.rev$interest_rate_pred <- ifelse(df.rev$Currency=='USD', df.rev$interest_rate_pred, fx_interest_rate_usd_equiv)
+  df.rev$interest_rate_pred <- ifelse(df.rev$Currency %in% c('USD','EUR', 'GBP'), df.rev$interest_rate_pred, fx_interest_rate_usd_equiv)
 
-  # rev.lm <- lm(revenue ~ bal_avg_loan + Loan.Tenor + Internal.Interest.Rate.... , data = filter(df.rev, WriteoffsDummy == 0))   # using original interest rate
-  rev.lm <- lm(revenue ~ bal_avg_loan + Loan.Tenor + interest_rate_pred ,           data = filter(df.rev, WriteoffsDummy == 0))
+  # linear model to predict revenue
+  # # rev.lm <- lm(revenue ~ bal_avg_loan + Loan.Tenor + Internal.Interest.Rate.... , data = filter(df.rev, WriteoffsDummy == 0))   # using original interest rate
+  # rev.lm <- lm(revenue ~ bal_avg_loan + Loan.Tenor + interest_rate_pred ,           data = filter(df.rev, WriteoffsDummy == 0))
 
-  revenue_predicted <- predict(rev.lm, df.rev, type = 'response')
+  # revenue_predicted <- predict(rev.lm, df.rev, type = 'response')
 
 
 # add predicted pd
@@ -91,19 +95,19 @@ sum(is.na(df.pd$sales_lag))
   # loans$probably_complete <- ifelse(loans$yield > 0.90, TRUE, FALSE)
   # loans$revenue_estimate  <- ifelse(loans$probably_complete, loans$revenue, ....)
   loans$revenue_estimate <- ifelse(loans$WriteoffsDummy == 1 | loans$revenue < 0.95, loans$revenue_predicted, loans$revenue)
+  
+  table(is.na(loans$revenue), is.na(loans$revenue_estimate))
 
-
-  loans$yield_ <- ifelse(loans$WriteoffsDummy == 1, loans$revenue_estimate / loans$disb, loans$yield)
-  # plot(loans$yield, loans$yield_)
-
-# add estimate revenue if sales
+  # loans$yield_ <- ifelse(loans$WriteoffsDummy == 1, loans$revenue_estimate / loans$disb, loans$yield)
+  # # plot(loans$yield, loans$yield_)
 
 # add expected revenue, expected loss, interest cost et al back to loans dataframe
 loans <- loans %>%
   mutate(
     ead = ifelse(Loan.Type == 'Line of Credit', 0.64, 0.54),
     lgd = ifelse(Loan.Use == 'Capital Expenditure', 0.69, 0.90),
-    el  = bal_avg_loan * pd_w_imputation * ead * lgd,
+    # el  = bal_avg_loan * pd_w_imputation * ead * lgd,
+    el  = bal_peak_loan * pd_w_imputation * ead * lgd,
     revenue_less_risk = revenue_estimate - el,
     interest_cost = Loan.Tenor/12 * 0.02 * bal_avg_loan,
     revenue_less_risk_less_debt = revenue_less_risk - interest_cost,

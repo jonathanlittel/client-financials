@@ -178,7 +178,8 @@
     	 	names(lc)[5] <- 'LoanID'
     	 	client_char <- filter(lc, !duplicated(RC.Account.Number))
     	 	client_char <- select(client_char, RC.Account.Number, Lending.Region,
-    	 		Portfolio, Sector.and.Perishability, Internal.Interest.Rate...., Loan.Tenor, Loan.Type, Loan.Use)
+          # Portfolio, Sector.and.Perishability, Internal.Interest.Rate...., Loan.Tenor, Loan.Type, Loan.Use) 
+    	 		Portfolio, Sector.and.Perishability)
     	 	id_match <- lc %>% select(RC.Account.Number, Account.Name) %>% distinct(RC.Account.Number, Account.Name)
     # read writeoffs
     	 	wo_file <- 'https://rootcapital.box.com/shared/static/om5mw9gj418w2jich40hasbb09fvjtih.csv'
@@ -296,6 +297,11 @@
       distinct(RC.Account.Number, Year, .keep_all = TRUE)
 
   # the above produces 0s if components are NA - this is not desirable
+      missing_stuff <- rev_temp$revenue_estimate==0 | rev_temp$expected_loss==0
+      rev_temp$revenue_less_risk[missing_stuff] <- NA
+      rev_temp$revenue_less_risk_per_year[missing_stuff] <- NA
+      rev_temp$revenue_less_risk_less_debt[missing_stuff] <- NA
+      rev_temp$revenue_less_risk_less_debt_per_year[missing_stuff] <- NA
 
     #--------- PREP OUTPUT -------------------------------------------
       
