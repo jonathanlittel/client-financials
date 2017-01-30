@@ -28,18 +28,26 @@ RecordType.Name, Internal_Date__c, Internal_Transaction_Amount__c, Internal_Prin
 Internal_Interest_Paid__c, Internal_Penalty_Interest_Paid__c, 
 Internal_Recoveries_Paid__c FROM Transaction__c WHERE RecordTypeId = '01270000000E137' AND Opportunity__r.Portfolio__c!='LAFCo'"
 
+
+# fees
+soqlQuery3 <- "SELECT Opportunity__r.RC_Opp_Number__c, Opportunity__r.Account.Country__c, Internal_Date__c, 
+Internal_Fees_Paid__c FROM Transaction__c WHERE Internal_Fees_Paid__c != 0 AND Opportunity__r.Portfolio__c!='LAFCo'"
 # run queries
 txns <- rforcecom.query(session, soqlQuery1)
 rpts <- rforcecom.query(session, soqlQuery2)
+fees <- rforcecom.query(session, soqlQuery3)
 
 # save to avoid re-running query
 txns_backup <- txns
 rpts_backup <- rpts
+fees_backup <- fees
 # convert to numeric
 num_cols <- names(txns)[c(2)]
 txns[num_cols] <- sapply(txns[num_cols], function(x) as.numeric(as.character(x)))
 num_cols <- names(rpts)[c(2:5,11)]
 rpts[num_cols] <- sapply(rpts[num_cols], function(x) as.numeric(as.character(x)))
+num_cols <- names(fees)[c(2)]
+fees[num_cols] <- sapply(fees[num_cols], function(x) as.numeric(as.character(x)))
 
 txns$Date <- as.Date(as.character(txns$Date__c, '%y-%m-%d'))
 
@@ -52,7 +60,8 @@ ds <- txns %>%
     year_origination = year(min(Date))
   )
 
-
+fees_group <- fees %>% group_by(Opportunity.RC_Opp_Number__c) %>% 
+  summarize(fee = sum(Internal_Fees_Paid__c, na.rm = TRUE))
 
 levels(txns$RecordType.Name)                      # note that there are six transaction types, adjustments
 
@@ -81,6 +90,13 @@ temp_disb <- as.vector(tx$disb)
 tx$disb <- temp_disb
 class(tx$disb)
 
-tx2 <- tx %>% mutate(revenue = pmt - disb, yield = pmt / disb)
+
+# join fee dataframe to main dataframe
+fees_group <- rename(fees_group, RC.Opp.Number = Opportunity.RC_Opp_Number__c)
+fees_group$RC.Opp.Number <- as.numeric(as.character(fees_group$RC.Opp.Number))
+
+tx2 <- left_join(tx, fees_group, by = 'RC.Opp.Number')
+
+# tx3 <- tx2 %>% mutate(revenue = pmt + fee - disb, yield = (pmt + fee) / disb)
 
 write.csv(tx2, 'tx2.csv', row.names = F)

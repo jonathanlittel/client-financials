@@ -9,11 +9,12 @@
 # 1. one row per loan
 # ----------------------------------------------------------------------------------------------------
 loan_out1 <- loans %>%
-  filter(!is.na(RC.Opp.Number | !is.na(Year))) %>%
+  filter(!is.na(RC.Opp.Number) | !is.na(Year)) %>%
+  filter(!is.na(RC.Opp.Number)) %>%
   distinct(RC.Opp.Number, .keep_all = T) %>%
-  select(RC.Opp.Number, Account.Name, 
- average_balance = bal_avg_loan, tenor = Loan.Tenor, interest_rate_estimate =  interest_rate_pred, probability_of_default = pd_w_imputation,
- ead, lgd, estimated_revenue = revenue_estimate,  interest_cost, expected_loss = el,  
+  select(RC.Opp.Number, Account.Name, RC.Account.Number, 
+ average_balance = bal_avg_loan, tenor = Loan.Tenor, disb, pmt, interest_rate_estimate =  interest_rate_pred, probability_of_default = pd_w_imputation,
+ ead, lgd, estimated_revenue = revenue_actual_or_predicted,  actual_revenue = revenue, interest_cost, expected_loss = el,  
  contribution_margin = revenue_less_risk_less_debt)
 
 filename1 <- paste0('expected_revenue_loan_level_', Sys.Date(), '.csv')
@@ -28,9 +29,9 @@ file.show(filename1)
 loan_out2 <- loans %>%
   filter(!is.na(RC.Opp.Number)) %>%
   distinct(RC.Opp.Number, Year, .keep_all = T) %>%
-  select(RC.Opp.Number, Account.Name, Year, months_outstanding_per_year,
+  select(RC.Opp.Number, Account.Name, Year, months_outstanding_in_year,
  average_balance = bal_avg_loan, tenor = Loan.Tenor, interest_rate_estimate =  interest_rate_pred, probability_of_default = pd_w_imputation,
- ead, lgd, estimated_revenue = revenue_estimate,  interest_cost, expected_loss = el,  
+ ead, lgd, estimated_revenue = revenue_actual_or_predicted,  interest_cost, expected_loss = el,  
  contribution_margin = revenue_less_risk_less_debt, 
  contribution_margin_per_year = revenue_less_risk_less_debt_per_year)
 
@@ -42,13 +43,16 @@ file.show(filename2)
 # ----------------------------------------------------------------------------------------------------
 
 client_out1 <- clients %>%
-  filter(!is.na(RC.Account.Number | !is.na(Year))) %>%
+  filter(!is.na(RC.Account.Number)) %>%
+  filter(!is.na(Account.Name)) %>%
   distinct(RC.Account.Number, Year, .keep_all = T) %>%
-  select(RC.Account.Number, Account.Name, Year,  active_year, # months_outstanding_per_year,
-  estimated_revenue = revenue_estimate, expected_loss,
+  select(RC.Account.Number, Account.Name, Year,  active_year, # months_outstanding_in_year,
+  estimated_revenue = revenue_actual_or_predicted, expected_loss,
   interest_cost, expected_loss,  
-  contribution_margin = revenue_less_risk_less_debt, 
-  contribution_margin_per_year = revenue_less_risk_less_debt_per_year)
+  # contribution_margin_per_year = revenue_less_risk_less_debt_per_year,
+  contribution_margin = revenue_less_risk_less_debt, loan_count,
+  sales_in_year_zero, sales_cagr, sales, producers, employees)
+
 
 filename3 <- paste0('expected_revenue_client_year_level_', Sys.Date(), '.csv')
 write.csv(client_out1, filename3, row.names = F)

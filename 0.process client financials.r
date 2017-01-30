@@ -1,11 +1,18 @@
-    # note: requires source('txns from sf.r') first, to load tx2, which is transaction and balance reports from SF
-
+# note: requires source('txns from sf.r') first, to load tx2, which is transaction and balance reports from SF
     library(dplyr)
     library(lubridate)
     library(tidyr)
     library(ggplot2)
     library(readxl)
     library(readr)
+
+# ----------------------helper functions-----------------------
+replace_na <- function(x, replacement = 0) {
+  # if(class(x) != 'numeric') stop('item must be numeric')
+  y <- x
+  y[is.na(x)] <- replacement
+  y
+}
 
     # --------------------------------------------------------
     # LOAD AND PREPARE DATA
@@ -58,7 +65,7 @@
         ungroup() %>% # add months outstanding per year
         group_by(LoanID, Year) %>%
         mutate(
-          months_outstanding_per_year = sum(bal_sum > 0))
+          months_outstanding_in_year = sum(bal_sum > 0))
 
     # variable for cumulative count and the (order) number of a loan
       # will need to be merged on account, LoanID (not year)
@@ -111,6 +118,8 @@
       bal4 <- distinct(bal3, RC.Opp.Number, Year, .keep_all = TRUE) %>%
         select(-date)
       sum(duplicated(bal4[,c('RC.Opp.Number', 'Year')])) 
+
+      bal4$Account.Name <- NULL # this is problematic when merging w/ changed account names eg Caravela
       
     # Replace NAs function
       replace_na <- function(x, replacement = 0) {
@@ -123,6 +132,7 @@
     # read transactions from salesforce
       # source('txns from sf.r') # run this when need to refresh sf data
       tx2 <- read.csv('tx2.csv') 
+
     # load more SEM data
         # sems_raw <- read.csv('master_data_with_alex.csv')
         sems_raw <- read_excel('SEMs for all Clients.xlsx', sheet = 1, na = "NA")
@@ -190,6 +200,18 @@
     	 	ids <- select(lc, RC.Opp.Number, RC.Account.Number, Account.Name)
     	 	tx3 <- left_join(tx2, ids, by = 'RC.Opp.Number')
     	 	names(lc)
+        # add writeoff info 
+        tx4 <- tx3 %>%
+          left_join( select(lc, LoanID, RC.Opp.Number)  ) %>%
+          left_join(wo)
+        tx4$LoanID <- NULL
+
+        # calculate repayemnts and fees, less disbursements
+        tx4$WriteoffsDummy <- replace_na(tx4$WriteoffsDummy)
+        tx4 <- tx4 %>%
+          mutate(revenue = ifelse(WriteoffsDummy==1, 0, pmt + fee - disb ))
+        tx5 <- tx4
+        tx5$WriteoffsDummy <- NULL
     	 	# add RC.Account.Number to txn data for merging with balance data
     # read sems
         setwd(wd_loc)
@@ -203,7 +225,7 @@
     # --------------------------------------------------------
     # MERGE    
 
-    	 	m1a <- full_join(x = bal4, y = tx3, by = c('RC.Opp.Number', 'Account.Name', 'RC.Account.Number')) # Account.Name converted to char
+    	 	m1a <- full_join(x = bal4, y = tx5, by = c('RC.Opp.Number', 'RC.Account.Number')) # Account.Name converted to char
         # merges balance from SF with txns (disb/rpmts) from SF. First sourced from csv, second from sql script.
     	 	setdiff(bal3$RC.Opp.Number, tx2$RC.Opp.Number)  # check that everything will match
     	 	setdiff(tx2$RC.Opp.Number, bal3$RC.Opp.Number)  # check that everything will match
@@ -269,39 +291,44 @@
 
       # remove duplicate rows... 110317 had two rows for 2005 at same loan id.. (?)
         # different sales #s (had two LoanIDs with different sales #s for that year)
-      
-      
-      source('C:/Box Sync/jlittel/comms/client financials/simple pd model.r')
+#----------------------------------------------------------------
+# revenue and expected loss estimates
+
+  source('C:/Box Sync/jlittel/comms/client financials/simple pd model.r')
+
+#----------------------------------------------------------------
+
 
     # prep revenue to get one rev/el/net per loan
     rev_temp <- loans %>%
       # filter(Year == year_one) %>%   # to avoid counting for multiple years - but leaves only year_n...
       group_by(RC.Opp.Number) %>%
-      filter(Year == min(Year)) %>%
+      dplyr::filter(Year == min(Year)) %>%
       distinct(RC.Opp.Number, .keep_all = TRUE) %>% # this should be redundant with above line...
+      # distinct(RC.Opp.Number, Year, .keep_all = TRUE) %>% # this should be redundant with above line...
       ungroup() %>%
       group_by(RC.Account.Number, Year) %>%
       summarise(
-        revenue_estimate          = sum(revenue_estimate, na.rm=TRUE),
+        revenue_actual_or_predicted          = sum(revenue_actual_or_predicted, na.rm=TRUE),
         el                        = sum(el, na.rm=TRUE),
         interest_cost             = sum(interest_cost, na.rm = TRUE), 
         revenue_less_risk_check   = sum(revenue_less_risk, na.rm=TRUE),
-        revenue_less_risk         = sum(revenue_estimate - el, na.rm=TRUE),
-        revenue_less_risk_per_year = sum(revenue_less_risk_per_year, na.rm=TRUE),
-        revenue_less_risk_less_debt = sum(revenue_less_risk_less_debt, na.rm = TRUE),
-        revenue_less_risk_less_debt_per_year = sum(revenue_less_risk_less_debt_per_year, na.rm = TRUE)
+        revenue_less_risk         = sum(revenue_actual_or_predicted - el, na.rm=TRUE),
+        # revenue_less_risk_per_year = sum(revenue_less_risk_per_year, na.rm=TRUE),         # would need to do this at loan-year level
+        # revenue_less_risk_less_debt_per_year = sum(revenue_less_risk_less_debt_per_year, na.rm = TRUE), # would need to do this at loan-year level
+        revenue_less_risk_less_debt = sum(revenue_less_risk_less_debt, na.rm = TRUE)
         ) %>%
-      select(RC.Account.Number, Year, revenue_less_risk, revenue_less_risk_per_year, 
-        revenue_less_risk_less_debt, revenue_less_risk_less_debt_per_year,
-        revenue_estimate = revenue_estimate, interest_cost, expected_loss = el ) %>%
+      dplyr::select(RC.Account.Number, Year, revenue_less_risk, revenue_less_risk_less_debt, 
+        # revenue_less_risk_per_year, revenue_less_risk_less_debt_per_year,
+        revenue_actual_or_predicted = revenue_actual_or_predicted, interest_cost, expected_loss = el ) %>%
       distinct(RC.Account.Number, Year, .keep_all = TRUE)
 
   # the above produces 0s if components are NA - this is not desirable
-      missing_stuff <- rev_temp$revenue_estimate==0 | rev_temp$expected_loss==0
+      missing_stuff <- rev_temp$revenue_actual_or_predicted==0 | rev_temp$expected_loss==0
       rev_temp$revenue_less_risk[missing_stuff] <- NA
-      rev_temp$revenue_less_risk_per_year[missing_stuff] <- NA
       rev_temp$revenue_less_risk_less_debt[missing_stuff] <- NA
-      rev_temp$revenue_less_risk_less_debt_per_year[missing_stuff] <- NA
+      # rev_temp$revenue_less_risk_per_year[missing_stuff] <- NA
+      # rev_temp$revenue_less_risk_less_debt_per_year[missing_stuff] <- NA
 
     #--------- PREP OUTPUT -------------------------------------------
       
@@ -321,11 +348,12 @@
     	             revenue:Internal.Interest.Rate...., processing_type, sales, # sales_growth_yoy,
     	             active_year,
     	             -LoanID) %>%          # careful about going from loan to client
-    	      # select(-RC.Opp.Number) %>%
+    	      # select(-RC.Opp.Number) %>% 
     	      # select(-balance) %>%         # this is just one per client, from bal4
     	      select(-active_year) %>%     # this is just one per client, from bal4
     	     ungroup()
-    	   
+
+
     	   clients <- left_join(clients, rev_temp, by = c('RC.Account.Number', 'Year'))
 
          clients$bal_avg_cl  <- NULL
@@ -341,7 +369,6 @@
     	     select(RC.Account.Number, Year, bal_avg, bal_peak, active_year) %>%
     	     right_join(clients, by = c('RC.Account.Number', 'Year'))
     	   
-    	 
     	   # fill in some things 
     	   clients <- clients %>%
     	     group_by(RC.Account.Number) %>% 
@@ -391,8 +418,10 @@
     	     select(RC.Account.Number, sales_in_year_zero, has_sales_zero) %>%
     	     right_join(clients, by = c('RC.Account.Number'))
 
+  filter(select(clients, Year, Account.Name, revenue_less_risk, revenue_less_risk, RC.Account.Number), RC.Account.Number==110348)
+       
     #------------------------------------
-    # MORE THINGS
+    # MORE FEATURES
 
     # cagrs and end to end growth rate
     	   
@@ -433,16 +462,17 @@
     write.csv(clients, 'clients.csv', row.names = FALSE)
 
 
-    pd_sales_graph <- ggplot(filter(clients, sales < 1e7), aes(x = sales, y = pd)) + 
-      geom_smooth(se = F, method = "lm", formula = y ~ splines::bs(x, 6)) + 
-      scale_x_continuous(labels = scales::dollar) + geom_point(alpha = 0.05)
-
+  pd_sales_graph <- ggplot(filter(clients, sales < 1.5e7), aes(x = sales, y = revenue_actual_or_predicted)) + 
+    geom_smooth(se = T, method = "lm", formula = y ~ splines::bs(x, 6)) + 
+    scale_x_continuous(labels = scales::dollar) + geom_point(alpha = 0.05) +
+    scale_y_continuous(labels = scales::dollar)
+  pd_sales_graph
 
 # output <- select(clients, Account.Name)
 # write.csv(clients, )
-# revenue_estimate
+# revenue_actual_or_predicted
 
-loan_out <- select(loans, RC.Opp.Number, Account.Name, Year, Currency, revenue, revenue_estimate, yield,
+loan_out <- select(loans, RC.Opp.Number, Account.Name, Year, Currency, revenue, revenue_actual_or_predicted,
  bal_avg_loan, Loan.Tenor, Internal.Interest.Rate...., interest_rate_pred, sales_lag_log, pd, pd_w_imputation,
  ead, lgd, el,  revenue_less_risk, interest_cost, revenue_less_risk_less_debt, revenue_less_risk_per_year,
  revenue_less_risk_less_debt, revenue_less_risk_less_debt_per_year)
