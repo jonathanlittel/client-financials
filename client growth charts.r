@@ -132,7 +132,12 @@ client_nom_growth <- clients %>%
     scale_x_continuous('Years as Client') +
     theme_hc()
 
+  lm.sales.pct <- lm(sales_50 ~ year_n + as.factor(`Vintage Year`), data = client_nom_growth)
+  test_data <- data.frame(year_n = seq(1, 7, 1), sales_50 = NA)
+  pred <- predict(lm.sales.pct, data = test_data)  # se.fit = FALSE,
+  plot(test_data)
 ggsave(paste0('sales_growth_by_vintage_', Sys.Date(), '.png'), plot = p_all_vintages, width = plot_width, height = plot_height)
+
 
 # -----------------------------------------------------------------------------------------------------------------
 # -------------------------------------------sales growth running pct----------------------------------------------
@@ -245,8 +250,9 @@ ggsave(paste0('sales_growth_by_vintage_running_pct_all_years_', Sys.Date(), '.pn
      could_be_active_next_year_sumum = sum(could_be_active_next_year, na.rm = TRUE),
      active_next_year_s = sum(active_next_year, na.rm = TRUE),
      attrition_rate = 1 - (sum(active_next_year, na.rm = TRUE) / sum(could_be_active_next_year, na.rm = TRUE)),
-     survival_pct = active_clients / max(client_count_in_vintage_year, na.rm = TRUE),
      n = n())
+
+
   round(attrition_rates_by_year_n, 2)
 
   # running/cumulative survival
@@ -264,6 +270,25 @@ ggsave(paste0('sales_growth_by_vintage_running_pct_all_years_', Sys.Date(), '.pn
     scale_y_continuous(labels = scales::percent)
   
 
+survival_table <- clients %>%
+    group_by(RC.Account.Number) %>%
+    filter(year_n > 0, Year <= 2016) %>%
+    arrange(year_n) %>%
+    mutate(
+      could_be_active_next_year = Year <= 2015 & active_year == TRUE,
+      active_next_year = lead(active_year, 1) | lead(active_year, 2) ,  # check if active in next *two* years
+      active_next_year = replace(active_next_year, is.na(active_next_year), FALSE)) %>%
+    ungroup() %>%
+    group_by(year_one, year_n) %>%
+    summarise(
+      active_clients = sum(active_year, na.rm = TRUE),
+      client_count_in_vintage_year = max(client_count_in_vintage_year, na.rm = TRUE),
+      survival_pct = active_clients / client_count_in_vintage_year
+    )
+survival_table
+
+ggplot(survival_table)
+#@@@@@@
 # -----------------------------------------------------------------------------------------------------------
 # --------------------------------survival rate 2006 vintage        -----------------------------------------
 # -----------------------------------------------------------------------------------------------------------
@@ -353,6 +378,27 @@ sum(!is.na(gazelle$three_year_cagr))
 
 gazelle %>% filter(five_year_cagr < 5) %>%
  ggplot() + geom_histogram(aes(x = five_year_cagr)) + scale_x_continuous(labels = scales::percent)
+
+# -----------------------------------------------------------------------------------------------------------
+# -------------------------------- write fit lines                     -----------------------------------------
+# -----------------------------------------------------------------------------------------------------------
+
+# formula to print equation in geom_text
+lm_eqn = function(m) {
+  
+  l <- list(a = format(coef(m)[1], digits = 2),
+            b = format(abs(coef(m)[2]), digits = 2),
+            r2 = format(summary(m)$r.squared, digits = 3));
+  
+  if (coef(m)[2] >= 0)  {
+    eq <- substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2,l)
+  } else {
+    eq <- substitute(italic(y) == a - b %.% italic(x)*","~~italic(r)^2~"="~r2,l)    
+  }
+  
+  as.character(as.expression(eq));                 
+}
+
 
 # -----------------------------------------------------------------------------------------------------------
 # -------------------------------- write output                     -----------------------------------------
