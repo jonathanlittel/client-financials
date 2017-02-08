@@ -1,0 +1,88 @@
+---
+title: "Client Growth"
+author: "jonathan littel"
+date: "August 18, 2016"
+output: 
+  ioslides_presentation
+---
+
+```{r  setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, error = FALSE)
+wd <- 'C:/Box Sync/jlittel/comms/client financials/data'
+setwd(wd)
+load('client_fin2.Rdata')
+options(digits = 0, scipen = 12)
+```
+
+## data
+
+- Social & environmental metrics
+- Client Financials (prior and while active clients)
+- Client characteristics (eg region, sector)
+- Revenue, Loss (expected/realized); assumptions for operating and interest expense
+
+`r dim(clients)[1]` observations of clients, with `r sum(clients$active_year)` observations with a loan outstanding
+## Median sales by first loan size
+
+```{r}
+sales.plot
+```
+
+## Payments to producers by loan type
+
+```{r }
+purchases.plot
+```
+
+## Sales where Root was the first lender
+
+```{r }
+first.plot
+```
+
+## Clusters
+
+
+```{r}
+cagrs.plot
+```
+
+## Africa - Sales growth by client
+
+```{r}
+afr.plot
+```
+Each line is a client (for which we lent and have data for at least 3 years)
+
+
+
+## Possible Cuts
+- Agroprocessors
+- Region
+- Country
+- Sales size at start
+- additionality
+- impact score
+
+## Example target statements
+
+For a segment, say African private enterprises with $500k - $1M in sales, working with Root enable the businesses to double their revenue in x years, increasing payments to producers by y. The cost of this was z in the first year, decreasing to i in the x year.
+
+## Clients which started with high growth
+
+```{r  setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, error = FALSE)
+wd <- 'C:/Box Sync/jlittel/comms/client financials/data'
+setwd(wd)
+load('clientfin3.RData')
+options(digits = 0, scipen = 12)
+```
+
+```{r}
+client.growth.plot
+```
+** grey line means growth was undefined at some point - only one year, infinite **
+
+```{r}
+loan.n.rev.plot5
+```

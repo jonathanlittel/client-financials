@@ -1,0 +1,177 @@
+---
+title: "Categorizing clients and 2017 vintage"
+date: "left - right arrows to scroll"
+output:
+  ioslides_presentation:
+    smaller: yes
+    widescreen: yes
+  beamer_presentation: default
+---
+
+
+
+```{r  setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, error = FALSE,
+                      messages = FALSE, cache = FALSE) # sets global default, can be overridden
+wd <- 'C:/Box Sync/jlittel/comms/client financials/data'
+setwd(wd)
+load('clientfin4.Rdata')
+options(digits = 0, scipen = 12)
+library(knitr)
+library(ggplot2)
+library(plotly)
+library(DT)
+library(streamgraph)
+op <- options(gvis.plot.tag='chart')
+```
+
+
+## What are we thinking about?
+
+![](http://www.verycool.it/wp-content/uploads/2012/08/Serpentine-Bulgari-adv-ai-2012-13-601x300.jpg)
+
+
+## What are we thinking about?
+
+Employing Root's experience with hundreds of clients to lend credibility to messaging, and market our portfolio in new ways. 
+
+
+## Client sales
+
+``` {r }
+ggplotly(balance_by_sales_all_graph)
+```
+
+In absolute terms, most of the portfolio has been well under $25M in sales. 
+
+
+## Client sales, under 5M
+
+
+``` {r }
+ggplotly(balance_by_sales_5M_graph)
+```
+
+## Impact - increase in sales 
+
+  
+``` {r }
+stream.vintage.increase.avg
+```
+
+We can convincingly show growth by cohorts. The typical client creates millions in sales after working with Root.
+
+## Probability of default by sales
+ 
+``` {r }
+options(digits = 2)
+ggplotly(pd_sales_graph)
+# pd_sales_graph
+```
+
+Sales size is also the strongest single indicator of risk, in particular below $1M.
+
+
+## Probability of default by sales
+
+
+``` {r }
+DT::datatable(loan_stats, caption = 'Completed Loans - risk by sales bins')	
+```
+
+
+## Probability of default by sales - 2013 and earlier
+
+
+``` {r }
+DT::datatable(loan_stats_2013_earlier, caption = 'Originated 2013 and prior completed Loans - risk by sales bins')
+```
+
+Writeoff rates are skewed for loans originated after 2013 - the good ones have repaid, and the bad ones remain on the books at a disproportionate rate.
+
+## Sales and probability of default by sales bins
+
+
+``` {r }
+DT::datatable(client_today_stats, caption = 'August 2016 Portfolio')
+```
+
+
+
+## Portfolio metrics by sales bin
+
+``` {r fig.width = 11, fig.height = 4.5}
+options(digits = 2)
+econ
+```
+
+By sales size, clients perform as one would expect. Notably, clients under $1M in sales on average don't cover cost of capital.
+
+## Impact metrics by sales bin
+
+``` {r fig.width = 11}
+imp
+```
+
+Interestingly, payment *per* producer increases as clients sales increase. 
+
+This would be useful to examine as a panel over time, and controlling for GDP/capita.
+
+
+## Balance and client count by sales bin
+
+``` {r fig.width = 11}
+options(digits = 0)
+library(gridExtra)
+grid.arrange(bal_sales_bar, client_sales_bar, ncol=2)
+```
+
+
+## Balance by approved amount and sales bin
+
+``` {r fig.width = 11}
+library(gridExtra)
+grid.arrange(bal_sales_bar, balance_by_Amount, ncol=2)
+```
+
+
+## Class of 2017
+
+
+``` {r }
+# tab2 <- gvisTable(outcomes, options = list(width = 600, height = 300))
+# print(tab2, "chart")
+outcomes$rev_net_risk <- outcomes$revenue_rc - outcomes$risk_rc
+outcomes1 <- outcomes
+for(i in 1:15) {
+  outcomes1[,i] <- prettyNum(round(outcomes[,i], 2), big.mark = ',')
+}
+rownames(outcomes1) <- paste0('Y', 1:5)
+outcomesT <- t(outcomes1)
+# colnames(outcomes1) <- paste0('Y', 1:5)
+
+DT::datatable(outcomesT)
+```
+
+Based on historical experience, this is how the class of 2017 in the 50k-500k loan size will perform over 5 years.
+
+## Impact - Class of 2017
+
+``` {r }
+# tab2 <- gvisTable(outcomes, options = list(width = 600, height = 300))
+# print(tab2, "chart")
+outcomes$rev_net_risk <- outcomes$revenue_rc - outcomes$risk_rc
+outcomes1 <- outcomes
+for(i in 1:15) {
+  outcomes1[,i] <- prettyNum(round(outcomes[,i], 2), big.mark = ',')
+}
+rownames(outcomes1) <- paste0('Y', 1:5)
+outcomesT <- t(outcomes1)
+# colnames(outcomes1) <- paste0('Y', 1:5)
+
+DT::datatable(outcomesT[11:20,])
+```
+
+Over 5 years, new clients in 2017 will lead to a _$13 increase_ in sales per dollar spent, 13x. 
+
+

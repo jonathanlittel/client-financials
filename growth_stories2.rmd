@@ -1,0 +1,53 @@
+---
+title: "Untitled"
+author: "jonathan littel"
+date: "August 24, 2016"
+output: ioslides_presentation
+---
+
+```{r  setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, error = FALSE)
+wd <- 'C:/Box Sync/jlittel/comms/client financials/data'
+setwd(wd)
+load('clientfin3.Rdata')
+options(digits = 0, scipen = 12)
+```
+
+
+## Sales by median growth rate
+
+
+```{r}
+client.growth.plot
+```
+**grey line means growth was undefined at some point - only one year, infinite**
+
+
+## Expected net revenue per client by sector
+
+```{r}
+loan.n.rev.plot5
+```
+
+
+## Expected net revenue by region
+
+
+```{r}
+loan.region.rev.plot
+```
+
+
+## RC was the first lender 
+
+```{r}
+client.rc.first.plot
+```
+
+**grey is unknown**
+
+## RC was the first lender 
+
+```{r}
+client.afr.plot
+```

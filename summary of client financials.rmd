@@ -1,0 +1,105 @@
+---
+title: "Summary of Client Financial data"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+wd <- 'C:/Box Sync/jlittel/comms/client financials'
+setwd(wd)
+load('client_fin.Rdata')
+options(digits = 0, scipen = 12)
+```
+
+## The data
+
+- Financials for ~1400 of ~2000 loans
+- Additional data from SKI
+- Financials for ~`r sum(!is.na(fin$sales[fin$active==TRUE]), na.rm=TRUE) / sum(fin$active) * 100`% of years with a loan outstanding
+- `r n_clients` clients
+- `r n_account_years` years where a client had a balance outstanding
+
+
+
+## For clients with data
+
+```{r echo = FALSE}
+options(digits = 2)
+rownames(bal_w_data) <- ''
+t(bal_w_data)
+options(digits = 1)
+```
+
+
+
+$`r bal_w_data[1,1] / 1e9`b in sales, on `r sum(!is.na(fin$sales[fin$active==TRUE]), na.rm=TRUE) / sum(fin$active) * 100`% of the years with a loan outstanding
+
+
+
+## Growth rates
+
+```{r }
+(t(growth_summary))
+```
+
+Median growth: __`r growth_summary['growth_median'] * 100`%__
+
+(from year before first loan to last year with available data)
+
+Median CAGR: __`r (growth_summary['cagr_median']) * 100`%__
+
+## Data is skewed
+
+Client | Year | Sales
+------------- | -------------
+Inka Gold | 2012 | $1m
+Inka Gold | 2013 |  $3m
+Inka Gold | 2014 |  ?
+Inka Gold | 2015 |  ?
+Inka Gold | 2016 |  ?
+
+
+If clients are growing, skew is towards lower sales
+
+
+## Absolute growth
+
+
+The year before the loan, clients had __$`r prettyNum(sum(cagrs$sales[cagrs$Year==cagrs$year_zero])/1e9, big.mark=',')`b__ sales, and in the most recent year for which we have sales data, __$`r prettyNum(sum(cagrs$sales[cagrs$Year==cagrs$max_sales_year])/1e9, big.mark=',')`b__.
+
+
+Root helped create at least __$`r (sum(cagrs$sales[cagrs$Year==cagrs$max_sales_year]) - sum(cagrs$sales[cagrs$Year==cagrs$year_zero])) / 1e6`m__ in sales.
+
+## Attribution
+
+Clients where Root was the majority financer in the first year^1^ grew at a cagr of `r median(cagrs$sales_cagr[cagrs$attribution==1], na.rm=TRUE) * 100`%
+
+^1^ Loan amount more than 60% of sales.
+
+
+## Imputing sales data
+
+We can get to a higher number for cumulative client revenue by estimating the missing data. 
+
+The theory (and data) indicates that clients are growing, and most of the missing data is in later years. 
+
+If we fill in the years as a root client with the sales for the most recent year we have data, cumulative sales is $`r sum(impute$sales[impute$balance>0], na.rm=TRUE) / 1e9`b. 
+
+(from $`r bal_w_data$sum_sales / 1e9`b before imputing)
+
+## Obligatory inscrutable graph
+
+```{r, echo=FALSE}
+library(ggplot2)
+grow_graph2 
+```
+
+`r prop.table(table(cagrs$grew))[2] * 100`% of clients grew in our data.
+This is likely biased low, as the data is skewed towards earlier in client's time with Root.
+
+## Growth by #  of Years as Root Client
+
+```{r, echo=FALSE, warning=FALSE}
+yr.gr
+```
+Growth tapers over multiple years as clients. 

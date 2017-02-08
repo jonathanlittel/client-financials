@@ -1,0 +1,214 @@
+---
+title: "class of 2017"
+output:
+  ioslides_presentation:
+    smaller: yes
+    widescreen: yes
+  beamer_presentation: default
+date: "September 11, 2016"
+---
+
+
+```{r  setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, error = FALSE,
+                      messages = FALSE, cache = FALSE) # sets global default, can be overridden
+wd <- 'C:/Box Sync/jlittel/comms/client financials/data'
+setwd(wd)
+load('clientfin4.Rdata')
+options(digits = 0, scipen = 12)
+library(knitr)
+library(ggplot2)
+library(plotly)
+library(DT)
+op <- options(gvis.plot.tag='chart')
+```
+
+
+## 2017 Vintage
+
+Say we have _30_ new clients which are similar to historical clients.
+
+In the beginning:  
+- Most sales ranging from 160k to $3m  (75% in that range)
+
+By year 5:  
+  
+- Half will leave the portfolio
+  + Half to risk, half to 'something else'
+- Sales will double for over half
+- Sales will triple or more for a handful
+- 80% will cover their marginal costs
+- 25% will generate $15k or more (rev net of exp risk)
+- Sales from 500k to $6m  (75% in that range)
+
+<!-- *** -->
+
+## 2017 Vintage
+
+  
+![](http://img.photobucket.com/albums/v447/cinecing/Clive%20Owen%202/Clive%20Owen%203/13-09-201015-23-49.png)
+
+
+
+## New clients 50k - 500k
+
+```{r}
+# p <- ggplot(filter(clients, Year==year_one, loan_size_cat=='50k-500k'), aes(x = Year)) +
+# # ggplot(filter(clients, Year==year_one), aes(x = Year, group = loan_size_cat)) +
+#   # geom_histogram(binwidth = 1, alpha = 0.5) +
+#   geom_histogram(bins = 18, alpha = .35) +
+#   stat_bin(aes(y=..count.., label=..count..), binwidth = 1, geom="text", vjust=-.5, bins = 18) +
+#   theme_minimal()
+p
+# gg <- ggplotly(p)
+```
+
+New clients by year, in the 50k-500k peak balance category. Apparently putting on the brakes in 2016..
+
+
+## Cost
+
+
+ . | Y1
+  | :---: 
+Clients | 30
+Balance | ~4.5M
+Revenue | 500k
+Risk (expected) | 400k
+Cash needed | $6m
+Interest expense | 120k
+Operating Expense | 7k-30k ea
+Operating Expense | 210k - 900k
+
+Revenue exceeds risk by about the cost of interest. Depending how you allocate $7m in opex, cost per loan is $7k to $30k, all-in net cost about $200k - 900k.
+
+
+## Cost
+
+By year 5, around half the clients will have risked or grown out:  
+  
+ . | Y1 | Y5
+  | :---: |
+Clients | 30 | 16
+Revenue | 500k |  450k
+Risk (expected) | 400k | 300k
+Balance | $4.5m | $5.5m
+Cash needed | $6m | $7m
+Interest expense | 120k | 140k
+Operating Expense | 7k-30k ea |  -
+Operating Expense | 210k - 900k | - 
+
+The risk estimate here might be a bit high, but net cost is approximately the same as in year 1.
+
+## Cost - net revenue
+
+
+```{r fig.width=6, fig.height=3.5}
+net.rev.plot
+```
+  
+*Net revenue - revenue less expected loss - increases over the clients life. The boxplot area shows the median, with area for about 75% of the data, and dots for the outliers.*  
+  
+In the first few years, median net revenue is just above zero. Most loans (80%+) generate more revenue than expected risk. By year 5, around 20% of loans are generating $20k+ (and expected loss is concentrated in some big losers..)
+
+## Impact - sales growth
+
+```{r, echo = FALSE, message = FALSE}
+sales.growth.quadrants
+# gg <- ggplotly(sales.growth.quadrants)
+# gg
+```
+
+*Sales growth split into quarters, 1/4 above the blue line, another quarter between each blue line.*  
+  
+By year 5, the typical client will have doubled sales.  
+
+## By sales size at start of relationship
+
+```{r fig.width=6, fig.height=3}
+# growth.rcfirst.plot
+gg <- ggplotly(growth.rcfirst.plot)
+gg
+```
+
+Grouped by sales size in the year before the first loan, clients grew faster when starting from a smaller sales base. Interestingly, clients where RC was the first lender grew faster in most categories.  
+
+*Examples:*
+Coprocael -> 900k to $21M  
+Essential Living Foods -> $150k $4.5M  
+Aprocass -> 23k to 700k  
+PRODUITS DU SUD -> 45k to $2.5M
+
+## Impact
+
+By year 5, around half the clients will have risked or grown out:  
+  
+ . | Y1 | 
+  | :---: |
+Clients | 30 
+Sales | $25m 
+Producers | 30k
+Wages | 1.75M
+Payments | $30M
+
+## Impact
+
+ . | Y1 | Y5
+  | :---: |
+Clients | 16 | 16
+Producers | 15k | 20k
+Sales | $25m | $50m 
+Wages | 800k |$1.5M
+Payments | $16M | $30M
+
+Looking just at clients who 'survive' to year 5.
+
+
+## Impact
+
+
+
+```{r fig.width=6, fig.height=3}
+prod.growth.quadrants
+```
+
+The bottom quartile has no growth in producers, the top doubles by year 5.
+
+
+## Impact - Summary
+
+``` {r }
+# tab2 <- gvisTable(outcomes, options = list(width = 600, height = 300))
+# print(tab2, "chart")
+outcomes$rev_net_risk <- outcomes$revenue_rc - outcomes$risk_rc
+outcomes1 <- outcomes
+for(i in 1:15) {
+  outcomes1[,i] <- prettyNum(round(outcomes[,i], 2), big.mark = ',')
+}
+rownames(outcomes1) <- paste0('Y', 1:5)
+outcomesT <- t(outcomes1)
+# colnames(outcomes1) <- paste0('Y', 1:5)
+
+DT::datatable(outcomesT)
+```
+
+## Impact - Summary
+
+``` {r }
+# tab2 <- gvisTable(outcomes, options = list(width = 600, height = 300))
+# print(tab2, "chart")
+outcomes$rev_net_risk <- outcomes$revenue_rc - outcomes$risk_rc
+outcomes1 <- outcomes
+for(i in 1:15) {
+  outcomes1[,i] <- prettyNum(round(outcomes[,i], 2), big.mark = ',')
+}
+rownames(outcomes1) <- paste0('Y', 1:5)
+outcomesT <- t(outcomes1)
+# colnames(outcomes1) <- paste0('Y', 1:5)
+
+DT::datatable(outcomesT[11:19,])
+```
+
+
+## Impact - Summary
+

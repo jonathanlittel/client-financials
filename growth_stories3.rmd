@@ -1,0 +1,307 @@
+---
+title: "client growth"
+date: "August 24, 2016"
+output:
+  ioslides_presentation:
+    widescreen: true
+    smaller: true
+---
+
+```{r  setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, error = FALSE)
+wd <- 'C:/Box Sync/jlittel/comms/client financials/data'
+setwd(wd)
+load('clientfin4.Rdata')
+options(digits = 0, scipen = 12)
+library(knitr)
+library(ggplot2)
+```
+
+
+## Data - sources
+
+* Data from client financials 2007 - 2015
+* Data from current SEMS 2010 - 2015
+* Data from two SEM datasets from 2000 - 2010
+  + Combined multiple SEM datasets for a single clean dataset, can now archive old data
+* Around `r dim(clients)[1]` client-years where we have some data about a client
+* `r sum(clients$active_year, na.rm = TRUE)` client-years where a client had an active balance
+* `r sum(!duplicated(clients$RC.Account.Number))` clients ever )))
+* `r sum(!is.na(clients$sales[clients$active_year==TRUE]))` years of sales data during active years, and `r sum(clients$Year==clients$year_zero, na.rm = TRUE)` years before the first loan 
+* `r sum(!duplicated(clients5$RC.Account.Number))` clients with 3 to 5 years of sales data
+
+
+## Data - completeness of sales data
+
+
+```{r}
+compl.plot
+```
+
+Sales data is collected after the active period of a loan, with a lag of one to two years. Above, for the 56 clients with 5 years of loans outstanding, we have an average of just under 50% of the sales of those five years.  
+
+Sales is the most complete data field in our set, so other fields (eg payments to producers) will have similar but lower completeness.
+
+## Data - sales data while client active
+
+```{r fig.width = 8, fig.height = 3.5}
+compl.sales.plot
+```
+
+Of the 650 total clients, we have no sales data (for active years) for about 250. There are just under 50 clients with 3 years of sales data, and about the same for 4 years of sales data.  
+
+Note that from the color scale, looking at a single bar, you can see there's not much concentration of any one vintage.
+
+
+## Simple look at growth
+
+
+```{r}
+growth_dist <- data.frame(quantile(clients$sales_growth_yoy[clients$active_year==TRUE], na.rm = TRUE, probs = seq(0, 1, by = 0.1)))
+options(digits = 2)
+colnames(growth_dist) <- c('Growth Rate')
+kable(t(growth_dist))
+```
+
+-  
+  
+During a given year with Root, a client's median sales growth rate was 17%.  
+  
+The number of years here is about `r sum(!is.na(clients$sales_growth_yoy[clients$active_year==TRUE]))`, out of `r sum(clients$active_year, na.rm = TRUE)` possible years.
+
+If you drop the top and bottom 5%, the average was `r mean(clients$sales_growth_yoy[clients$active_year==TRUE], na.rm = TRUE, trim = 0.05)`  
+Growth was more than 33% for 40% of client-years.
+
+
+## Subsetting to where we have complete-ish data 
+
+
+Now, zoom in on those clients where we have 3 to 5 years of sales data, who started with a loan in the $50k to $500k range.  
+
+
+```{r}
+options(digits = 2)
+kable(clients5_sum[1:4,1:5]) # because there's 5 years of sales, incl y zero
+options(digits = 0)
+```
+-  
+These clients grew 28% in their first year, and 14% in the following year. Fewer clients have made and reported data on years 3 and 4, but those that have continue to grow.
+
+
+
+## Subsetting to where we have complete-ish data  
+
+```{r}
+# kable(table(clients5_1$Lending.Region))
+# kable(table(clients5_1$year_zero))
+table(clients5_1$Lending.Region)
+table(clients5_1$year_zero)
+```
+
+Of the the 100ish clients, the are spread throughout regions and vintage years fairly evenly.  
+
+
+## Subsetting to where we have complete-ish data  
+
+```{r}
+clients5.all.line
+```
+
+A quick look at the sales of each of the ~100ish clients in this group.
+
+## CAGRS for the subset
+
+```{r}
+growth_dist <- data.frame(quantile(clients5_1$sales_cagr, probs = c(0, 0.25, 0.35, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 1)))
+options(digits = 2)
+colnames(growth_dist) <- c('CAGR')
+growth_dist$Sales_Growth <- quantile(clients5_1$sales_growth, probs = c(0, 0.25, 0.35, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 1))
+kable(t(growth_dist))
+```
+
+Over half the clients grew at least 50%, with about 35% doubling in 3 to 5 years.
+
+## Cut: sales size at start of relationship
+
+```{r fig.width=6, fig.height=3}
+growth.rcfirst.plot
+```
+
+Grouped by sales size in the year before the first loan, clients grew faster when starting from a smaller sales base. Interestingly, clients where RC was the first lender grew faster in most categories. 
+Examples:
+Coprocael -> 900k to $21M  
+Essential Living Foods -> $150k $4.5M  
+Aprocass -> 23k to 700k  
+PRODUITS DU SUD -> 45k to $2.5M  
+
+
+## Attrition rates by years as clients (1/2)
+
+``` {r}
+t1 <- t(attrition_rates_by_year_n50k)
+colnames(t1) <- t1[1,]
+kable(t1[-1,])
+```
+  
+>  
+  
+The percentage of clients who did not have a balance in the following year, for the years 1999 to 2015 (a '14 to '15 attrition rate is included, a '15 to '16 is not since we are mid-2016). Still filtered for clients whose 1st loan was in the 50k-500k segment.  
+  
+Eg. there are three clients with 14 years of lending with root, and one - __La Union de Huatusco__ - was lost in 2014. Both Prodecoop and Cocla were active in year 14 in 2015, but are not shown (yet) as attrition.  
+  
+Note that the low attrition in the first year is due to client typically still having their first loan oustanding into the following year.
+
+By year, attrition is consistently in the 15% range.  
+
+## Attrition rates by years as clients (2/2)
+
+``` {r}
+t1 <- t(attrition_rates_by_year_n50k)
+colnames(t1) <- t1[1,]
+kable(t1[-1,])
+```
+  
+>  
+  
+
+While attrition is roughly 15%, it's worth noting that by loan, the average writeoff rate is 8.5% for the first loan, decreasing to 2-3% for later loans. So the reason for attrition likely changes as the client matures.
+
+## Attrition rates by consecutive loan number
+
+
+``` {r}
+options(digits = 0)
+t2 <- t(attrition_rates_by_loan_by_year_n50k)
+colnames(t2) <- t2[1,]
+options(digits = 2)
+kable(t2[-c(1,4),1:10])
+kable(t2[-c(1,4),11:dim(t2)[2]])
+```
+  
+  
+Attrition for the first loan is quite high, and tapers as clients receive progressive loans. As a reference, we expect roughly 10% of loans to reach writeoff (and consequently not be renewed).  
+
+## Impact - producers reached
+
+
+```{r fig.width=7, fig.height=3.5}
+prod.plot
+```
+  
+Producers generally increase in all regions over years with an active loan (blue line is a fitted regression). 
+
+In the first year, producers reached grew by a median of 9%, and continued to grow above 10% through year 5. 
+
+## Impact - payments to producers
+
+
+```{r fig.width=7, fig.height=4}
+pmts.plot
+```
+  
+In the first year, payments to producers grew at a median of 28%, increasing to over 60% total growth by year 5.  
+
+## Payments growth by animal 
+
+```{r fig.width=6, fig.height=3.5}
+payments.plot
+```
+
+
+## Impact - wages by processing type
+
+
+```{r fig.width=7, fig.height=4}
+wages.ag.plot
+```
+  
+  
+## Cost - net revenue
+
+
+```{r fig.width=6, fig.height=3.5}
+net.rev.plot
+```
+  
+Net revenue - revenue less expected loss - increases over the clients life. 
+
+The boxplot area shows the median, with area for about 75% of the data, and dots for the outliers.
+
+In the first few years, median net revenue is just above zero. Most loans (80%+) generate more revenue than expected risk. 
+
+
+
+
+## Constructing a portfolio
+
+Let's imagine a $10M vehicle. In year one, it could reach around $10M in client balances (at say 85% utilization of cash, and  turnover of around 20% to clients, and the generous assumption that the clients are lined up and ready for early disbursement).
+
+Here is our experience with these loans:  
+```{r}
+kable(portfolio_stat)
+```
+
+## Constructing a portfolio
+
+With $10M we can imagine deploying around $8.0M on average, or less, after liquidity constraints. If we assume the an average utilization of the $180k peak) per client is 75%, we could serve ~60 new clients in year one.
+
+This is hypothetical in that Root could work with all clients from day one, an actual rollout period would be lagged.
+
+
+## Constructing a portfolio - Year 1
+
+In year 2, 95% of the clients would continue to have a balance, but we would expect to see attrition of the first loan of ~24%. From the 60, we would need to replace !! to maintain the same *number* of clients.  
+
+The remaining clients would see a balance increase of 25% on average (180k to 230k, before adjusting for utilization), and require approximately 6.5M in financing (after adjusting). 10% of the clients will have fallen in to arrears, and approximating $1.3M would be tied up with those clients.
+
+## Costs 
+
+
+```{r}
+kable(el_sum[1:5,1:4])
+```
+
+Looking at all loans where we were able to produce a loss estimate, above are the average expected loss rates in dollars. Note that these are all projected, mostly using the recent work from the risk appetite project.  
+
+## Costs 
+
+
+```{r}
+kable(el_sum[1:5,c(1,4:8)])
+```
+
+
+## Costs 
+
+``` {r}
+o <- data.frame(
+  `Revenue to RC` = outcomes$revenue_rc[c(1,5)],
+  `Estimated Risk` = outcomes$risk_rc[c(1,5)],
+  
+)
+
+
+<!-- . | Year 1 | Cumulative 5  -->
+<!-- ---- | ----: | ----: -->
+<!-- Revenue | `r outcomes$revenue_rc[1]` -->
+
+## Costs - summary over 5 years
+
+. | 
+Interest $8M at 1% per year = $480k
+Cost of Equity of $2M = $0  
+Marginal opex for ~60 clients per year = $1.6M  
+Fixed opex = Whatever we can charge, 6.6M if we charge at the current average of $30k/ client  
+Net Revenue* = $1.5M  - $2.5M  
+
+ *From a RC business viability perspective, this is a rough (and low) estimate. 
+
+## Impact - Summary
+
+Starting with 60 clients, half* will make it to year 5.
+
+Those starting with sales of under 265k will quadruple (as a median), and those starting from 265k to 1M will double (as a median). Those two sales bins represent 1/4 each of the 100 client subset with 3-5 years data, so it is representative to say that 60 clients, 30 will survive, and of the 15 that started in each bin, half will perform as the historical set performed. 
+
+
+* *Under a simple 15% attrition by client - some work still needs to be done on the difference in attrition by year, by loan, and by risk 'overhang'. 
+

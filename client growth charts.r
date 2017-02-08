@@ -132,10 +132,18 @@ client_nom_growth <- clients %>%
     scale_x_continuous('Years as Client') +
     theme_hc()
 
-  lm.sales.pct <- lm(sales_50 ~ year_n + as.factor(`Vintage Year`), data = client_nom_growth)
+  
+  # lm.sales.nom2 <- lm(sales_50 ~ year_n + as.factor(`Vintage Year`)
+  lm.sales.nom2 <- lm(sales_50 ~ year_n + as.factor(`Vintage Year`), 
+                     data = filter(client_nom_growth, as.numeric(`Vintage Year`) > 2002)
+  )
+  lm.sales.nom <- lm(sales_50 ~ year_n, data = client_nom_growth)
+  summary(lm.sales.nom)
+  
   test_data <- data.frame(year_n = seq(1, 7, 1), sales_50 = NA)
-  pred <- predict(lm.sales.pct, data = test_data)  # se.fit = FALSE,
-  plot(test_data)
+  pred <- predict(lm.sales.nom, test_data)  # se.fit = FALSE,  # interval = "confidence"
+  pred.conf <- predict(lm.sales.nom, test_data,interval = "confidence")  # se.fit = FALSE,  # 
+  plot(test_data[,1], pred)
 ggsave(paste0('sales_growth_by_vintage_', Sys.Date(), '.png'), plot = p_all_vintages, width = plot_width, height = plot_height)
 
 
